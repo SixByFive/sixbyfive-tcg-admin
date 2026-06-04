@@ -1,0 +1,26 @@
+import { resolve } from 'path'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  main: {
+    plugins: [externalizeDepsPlugin()],
+  },
+  preload: {
+    plugins: [externalizeDepsPlugin()],
+  },
+  renderer: {
+    optimizeDeps: {
+      include: ['@tcg-admin/types'],
+    },
+    resolve: {
+      alias: {
+        '@': resolve('src/renderer/src'),
+        '@tcg-admin/api-client': resolve('../../packages/api-client/src/index.ts'),
+        '@tcg-admin/types': resolve('../../packages/types/src/index.ts'),
+      },
+    },
+    plugins: [react(), tailwindcss()],
+  },
+})

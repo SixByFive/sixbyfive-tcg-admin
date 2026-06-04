@@ -1,0 +1,11 @@
+{
+  "appId": "com.sixbyfive.tcgadmin",
+  "appName": "TCG Admin",
+  "webDir": "apps/desktop/out/renderer",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": ["src/renderer/**/*", "src/renderer/env.d.ts"],
+  "compilerOptions": {
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/renderer/src/*"],
+      "@tcg-admin/api-client": ["../../packages/api-client/src/index.ts"],
+      "@tcg-admin/types": ["../../packages/types/src/index.ts"]
+    }
+  }
+}
