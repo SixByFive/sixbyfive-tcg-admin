@@ -7,3 +7,5 @@ dist
 .env.local
 android
 ios
+/apps/desktop/release
+/apps/admin-mobile/.expo

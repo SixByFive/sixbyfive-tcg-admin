@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { adminApi } from '@/lib/api'
-import { formatPence, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import type { AdminOrder } from '@tcg-admin/types'
 
-const STATUS_OPTIONS = ['', 'PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'DISPUTED']
+const FULFILMENT_OPTIONS = ['', 'PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'DISPUTED']
 
 function statusColor(s: string) {
   if (s === 'CANCELLED') return 'text-destructive bg-destructive/10'
@@ -37,7 +37,7 @@ export function OrdersPage(): JSX.Element {
     <div>
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-2xl font-bold text-foreground">Orders</h1>
-        <span className="text-sm text-muted-foreground">{total.toLocaleString()} total</span>
+        <span className="text-sm text-muted-foreground">{total.toLocaleString()}+ loaded</span>
       </div>
 
       <div className="mb-3 flex items-center gap-2">
@@ -46,7 +46,7 @@ export function OrdersPage(): JSX.Element {
           onChange={e => { setStatus(e.target.value); setPage(1) }}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none"
         >
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s || 'All statuses'}</option>)}
+          {FULFILMENT_OPTIONS.map(s => <option key={s} value={s}>{s || 'All fulfilment statuses'}</option>)}
         </select>
         <button onClick={load} className="rounded-md bg-accent px-3 py-2 text-sm text-foreground hover:bg-accent/80">Refresh</button>
       </div>
@@ -57,7 +57,7 @@ export function OrdersPage(): JSX.Element {
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-card">
             <tr>
-              {['Order ID', 'Buyer', 'Seller', 'Status', 'Payment', 'Total', 'Date'].map(h => (
+              {['Order ID', 'Buyer', 'Seller', 'Fulfilment', 'Payment', 'Total', 'Date'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">{h}</th>
               ))}
             </tr>
@@ -71,12 +71,12 @@ export function OrdersPage(): JSX.Element {
                 <td className="px-4 py-3 text-foreground">{o.buyer?.username ?? o.buyerId}</td>
                 <td className="px-4 py-3 text-foreground">{o.seller?.username ?? o.sellerId}</td>
                 <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor(o.status)}`}>{o.status}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor(o.fulfilmentStatus)}`}>{o.fulfilmentStatus}</span>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor(o.paymentStatus)}`}>{o.paymentStatus}</span>
                 </td>
-                <td className="px-4 py-3 font-medium text-foreground">{formatPence(o.totalPricePence)}</td>
+                <td className="px-4 py-3 font-medium text-foreground">£{(o.totalAmount ?? 0).toFixed(2)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{formatDate(o.createdAt)}</td>
               </tr>
             ))}

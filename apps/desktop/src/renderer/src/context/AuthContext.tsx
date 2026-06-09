@@ -43,24 +43,28 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     if (!refreshToken) { setIsLoading(false); return }
 
     authApi.refresh(refreshToken)
-      .then(({ accessToken, refreshToken: newRefresh }) => {
+      .then(({ accessToken, refreshToken: newRefresh, user: refreshUser }) => {
         apiClient.setAccessToken(accessToken)
         localStorage.setItem(REFRESH_KEY, newRefresh)
         installRefresh()
+        // Use the user bundled in the refresh response, or fall back to /auth/me
+        if (refreshUser) { setUser(refreshUser); return null }
         return authApi.me()
       })
-      .then(setUser)
+      .then((me) => { if (me) setUser(me) })
       .catch(() => localStorage.removeItem(REFRESH_KEY))
       .finally(() => setIsLoading(false))
   }, [])
 
   async function login(email: string, password: string): Promise<void> {
-    const { accessToken, refreshToken } = await authApi.login(email, password)
+    const { accessToken, refreshToken, user: loginUser } = await authApi.login(email, password)
     apiClient.setAccessToken(accessToken)
     localStorage.setItem(REFRESH_KEY, refreshToken)
     installRefresh()
-    const me = await authApi.me()
-    if (me.role !== 'ADMIN' && me.role !== 'admin') {
+    // auth-service bundles the user in the login response body (X-Client-Type: mobile),
+    // so we skip a second /auth/me round-trip when possible.
+    const me = loginUser ?? await authApi.me()
+    if (!me.isAdmin && me.role !== 'ADMIN' && me.role !== 'admin') {
       doLogout()
       throw new Error('Admin access required.')
     }

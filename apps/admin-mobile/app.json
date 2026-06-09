@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "TCG Admin",
+    "slug": "tcg-admin-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "tcgadmin",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#16171c"
+      },
+      "package": "com.sixbyfive.tcgadminmobile",
+      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#2963FF"
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "tcg-admin-mobile"
+      }
+    }
+  }
+}
