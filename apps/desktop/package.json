@@ -12,6 +12,7 @@
   "build": {
     "appId": "com.sixbyfive.tcgadmin",
     "productName": "TCG Admin",
+    "npmRebuild": false,
     "win": {
       "target": "nsis",
       "icon": "resources/icon.ico"
@@ -50,7 +51,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "electron": "^33.0.0",
+    "electron": "33.4.11",
     "electron-builder": "^25.0.0",
     "electron-vite": "^2.3.0",
     "tailwindcss": "^4.0.0",
