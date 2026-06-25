@@ -71,6 +71,7 @@ export interface AdminAuditLog {
 export interface AdminBinder {
   id: string
   userId?: string
+  username?: string
   name: string
   visibility: string
   isDeleted: boolean
@@ -121,6 +122,10 @@ export interface CatalogSet {
   abbreviation?: string
   official_count?: number
   total_cards?: number
+  // Actual count of m_cards rows for this set — distinct from total_cards
+  // (the upstream-reported official size, which can stay null for a while
+  // after a set releases even though cards have already been ingested).
+  ingested_cards?: number
   enabled?: boolean
 }
 
@@ -316,4 +321,9 @@ export interface DockerRestartAllResult {
   restarted: number
   failed: number
   results: Array<{ name: string; ok: boolean; error: string | null }>
+}
+
+export interface MailboxSummary {
+  address: string
+  label: string
 }

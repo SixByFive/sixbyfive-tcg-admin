@@ -177,7 +177,7 @@ export function SubscriptionsPage(): JSX.Element {
 
           <div className="text-xs space-y-1.5">
             <Row label="ID" value={selected.id.slice(0, 12) + '…'} />
-            <Row label="User" value={selected.userId?.slice(0, 12) + '…' ?? '—'} />
+            <Row label="User" value={selected.userId ? selected.userId.slice(0, 12) + '…' : '—'} />
             <Row label="Plan" value={selected.plan?.name ?? selected.planId ?? '—'} />
             <Row label="Status" value={selected.status} />
             <Row label="Period end" value={selected.currentPeriodEnd ? formatDate(selected.currentPeriodEnd) : '—'} />

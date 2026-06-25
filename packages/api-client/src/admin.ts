@@ -9,6 +9,7 @@ import type {
   ProofQueueItem, ReviewQueueItem,
   OrderDispute, AdminRevenueSummary, AdminMarketplaceRevenue,
   DockerService, DockerRestartAllResult,
+  MailboxSummary,
 } from '@tcg-admin/types'
 
 const PAGE_SIZE = 20
@@ -145,14 +146,19 @@ export function createAdminApi(client: ApiClient) {
     },
 
     // ── Financials ─────────────────────────────────────────────────────────
-    // adminStats does not exist in the gateway schema yet.
-    // Return a zero-state so the page renders without error.
+    // A combined adminStats query doesn't exist in the gateway schema yet —
+    // totalUsers is real (adminUserCount); the rest stay zero-state stubs
+    // until their own backend support lands.
 
     async getStats() {
+      const totalUsers = await client.gql<{ adminUserCount: number }>(
+        `query AdminUserCount { adminUserCount }`
+      ).then(d => d.adminUserCount).catch(() => 0)
+
       return {
         totalRevenuePence: 0,
         revenueThisMonthPence: 0,
-        totalUsers: 0,
+        totalUsers,
         activeSubscriptions: 0,
         openOrders: 0,
         openTrades: 0,
@@ -238,7 +244,7 @@ export function createAdminApi(client: ApiClient) {
       const data = await client.gql<{ adminBinders: AdminBinder[] }>(
         `query AdminBinders($limit: Int, $offset: Int) {
           adminBinders(limit: $limit, offset: $offset) {
-            id userId name visibility isDeleted createdAt
+            id userId username name visibility isDeleted createdAt
           }
         }`,
         { limit, offset }
@@ -670,6 +676,36 @@ export function createAdminApi(client: ApiClient) {
         `/docker-admin/services/${encodeURIComponent(name)}/logs?tail=${tail}`,
         { skipAuthRefresh: true }
       )
+    },
+
+    // ── Mailbox webmail SSO ─────────────────────────────────────────────────
+    // All calls go through the gateway /mail-admin proxy → mail-mgmt service.
+    // Protected by x-admin-key (auto-forwarded by apiClient.rest via setAdminApiKey).
+
+    async getMailboxes(): Promise<MailboxSummary[]> {
+      return client.rest<MailboxSummary[]>('/mail-admin/mailboxes', { skipAuthRefresh: true })
+    },
+
+    async addMailbox(address: string, password: string, label?: string): Promise<{ ok: boolean; address: string }> {
+      return client.rest('/mail-admin/mailboxes', {
+        method: 'POST',
+        body: JSON.stringify({ address, password, label }),
+        skipAuthRefresh: true,
+      })
+    },
+
+    async removeMailbox(address: string): Promise<{ ok: boolean; address: string }> {
+      return client.rest(`/mail-admin/mailboxes/${encodeURIComponent(address)}`, {
+        method: 'DELETE',
+        skipAuthRefresh: true,
+      })
+    },
+
+    async openMailboxWebmail(address: string): Promise<{ token: string; url: string }> {
+      return client.rest(`/mail-admin/mailboxes/${encodeURIComponent(address)}/sso-token`, {
+        method: 'POST',
+        skipAuthRefresh: true,
+      })
     },
   }
 }

@@ -36,6 +36,7 @@ export function BindersPage(): JSX.Element {
   const filtered = search.trim()
     ? binders.filter(b =>
         b.name?.toLowerCase().includes(search.toLowerCase()) ||
+        b.username?.toLowerCase().includes(search.toLowerCase()) ||
         b.userId?.toLowerCase().includes(search.toLowerCase())
       )
     : binders
@@ -57,7 +58,7 @@ export function BindersPage(): JSX.Element {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Filter by name or owner ID…"
+          placeholder="Filter by name or owner…"
           className="w-56 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
         <button onClick={load} disabled={loading || !!deleting} className="rounded-md bg-accent px-3 py-2 text-sm text-foreground hover:bg-accent/80 disabled:opacity-50">Refresh</button>
@@ -69,7 +70,7 @@ export function BindersPage(): JSX.Element {
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-card">
             <tr>
-              {['Name', 'Owner ID', 'Visibility', 'Created', 'Status', 'Actions'].map(h => (
+              {['Name', 'Owner', 'Visibility', 'Created', 'Status', 'Actions'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">{h}</th>
               ))}
             </tr>
@@ -85,7 +86,11 @@ export function BindersPage(): JSX.Element {
                   <p className="font-medium text-foreground">{b.name}</p>
                   <p className="font-mono text-xs text-muted-foreground">{b.id.slice(0,8)}…</p>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground max-w-[120px] truncate">{b.userId ?? '—'}</td>
+                <td className="px-4 py-3 max-w-[160px] truncate">
+                  {b.username
+                    ? <span className="text-foreground">{b.username}</span>
+                    : <span className="font-mono text-xs text-muted-foreground">{b.userId ?? '—'}</span>}
+                </td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${visibilityColor(b.visibility)}`}>
                     {b.visibility}

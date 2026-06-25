@@ -19,6 +19,7 @@ import {
   Database,
   Server,
   Container,
+  Mail,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -84,8 +85,9 @@ const navGroups: NavGroup[] = [
   {
     label: 'Infrastructure',
     items: [
-      { to: '/services', label: 'Services', icon: Server },
-      { to: '/docker',   label: 'Docker',   icon: Container },
+      { to: '/services',   label: 'Services', icon: Server },
+      { to: '/docker',     label: 'Docker',   icon: Container },
+      { to: '/mailboxes',  label: 'Webmail',  icon: Mail },
     ],
   },
 ]

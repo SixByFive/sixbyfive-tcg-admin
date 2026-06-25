@@ -1,0 +1,65 @@
+name: Release desktop app
+
+# Push a tag like v1.0.1 to build the Windows installer and publish it to
+# the self-hosted update feed. The repo is private, so updates are served
+# from our own VPS (apps/desktop/package.json -> build.publish) instead of
+# GitHub Releases — no token is shipped inside the app.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `...@tcg-admin/desktop` builds the desktop app AND its workspace
+      # dependencies (types, api-client) first — those packages' dist/ is
+      # gitignored, so it must be built in CI, not just the desktop app
+      # itself, or the TypeScript build fails resolving @tcg-admin/* imports.
+      - name: Build workspace packages + desktop app
+        run: pnpm exec turbo run build --filter=...@tcg-admin/desktop
+
+      - name: Package installer (no auto-publish — we upload it ourselves)
+        run: pnpm --filter @tcg-admin/desktop exec electron-builder --publish never
+
+      - name: Upload installer to the update feed via SFTP
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.ADMIN_DEPLOY_HOST }}
+          DEPLOY_KEY: ${{ secrets.ADMIN_DEPLOY_SSH_KEY }}
+        run: |
+          set -e
+          RELEASE_DIR="apps/desktop/release"
+          KEY_FILE="$RUNNER_TEMP/admin_deploy_key"
+          printf '%s\n' "$DEPLOY_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          BATCH_FILE="$RUNNER_TEMP/sftp_batch.txt"
+          {
+            echo "cd incoming"
+            for f in "$RELEASE_DIR"/*.exe "$RELEASE_DIR"/*.exe.blockmap "$RELEASE_DIR"/latest.yml; do
+              [ -e "$f" ] || continue
+              printf 'put "%s"\n' "$f"
+            done
+          } > "$BATCH_FILE"
+
+          sftp -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=accept-new \
+            -b "$BATCH_FILE" \
+            admin-deploy@"$DEPLOY_HOST"

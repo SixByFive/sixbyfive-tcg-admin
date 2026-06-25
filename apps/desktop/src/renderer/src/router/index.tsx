@@ -19,6 +19,7 @@ import { ReviewsPage } from '@/pages/ReviewsPage'
 import { SetsPage } from '@/pages/SetsPage'
 import { ServicesPage } from '@/pages/ServicesPage'
 import { DockerPage } from '@/pages/DockerPage'
+import { MailboxesPage } from '@/pages/MailboxesPage'
 
 export const router = createHashRouter([
   {
@@ -44,6 +45,7 @@ export const router = createHashRouter([
       { path: 'sets', element: <SetsPage /> },
       { path: 'services', element: <ServicesPage /> },
       { path: 'docker', element: <DockerPage /> },
+      { path: 'mailboxes', element: <MailboxesPage /> },
     ],
   },
 ])

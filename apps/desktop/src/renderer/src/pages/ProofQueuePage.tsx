@@ -112,8 +112,8 @@ export function ProofQueuePage(): JSX.Element {
           <div className="text-xs space-y-1.5">
             <Row label="ID" value={selected.id.slice(0, 12) + '…'} />
             <Row label="Title" value={selected.title ?? '—'} />
-            <Row label="Card ID" value={selected.cardId?.slice(0, 12) + '…' ?? '—'} />
-            <Row label="Seller ID" value={selected.sellerId?.slice(0, 12) + '…' ?? '—'} />
+            <Row label="Card ID" value={selected.cardId ? selected.cardId.slice(0, 12) + '…' : '—'} />
+            <Row label="Seller ID" value={selected.sellerId ? selected.sellerId.slice(0, 12) + '…' : '—'} />
             <Row label="Price" value={selected.price != null ? `£${selected.price.toFixed(2)}` : '—'} />
             <Row label="Proof code" value={selected.proofCode ?? '—'} />
           </div>

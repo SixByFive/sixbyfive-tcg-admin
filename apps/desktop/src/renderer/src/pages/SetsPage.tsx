@@ -287,7 +287,14 @@ export function SetsPage(): JSX.Element {
                   <td className="px-4 py-3 text-muted-foreground text-xs">{s.era ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">{s.release_date?.slice(0, 10) ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground tabular-nums text-xs">
-                    {s.total_cards ?? '—'}{s.official_count ? ` / ${s.official_count}` : ''}
+                    {(() => {
+                      const ingested = s.ingested_cards ?? 0
+                      const official = s.official_count ?? s.total_cards ?? null
+                      if (!ingested && !official) return '—'
+                      if (!ingested) return official // nothing ingested yet, official size known
+                      if (!official || official === ingested) return ingested // ingestion complete (or official unknown)
+                      return `${ingested} / ${official}` // partially ingested against a known official size
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.enabled !== false ? 'bg-green-500/10 text-green-400' : 'bg-accent text-muted-foreground'}`}>
