@@ -25,8 +25,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # node-linker=hoisted avoids pnpm's deeply-nested .pnpm virtual store
+      # (folder names like app-builder-lib@25.1.8_dmg-builder@25.1.8_..._<hash>)
+      # which pushes some packages' file paths past Windows' 260-char MAX_PATH,
+      # breaking electron-builder's NSIS step. Scoped to this CI run only —
+      # not changing node-linker for local dev or other apps in the workspace.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
       # `...@tcg-admin/desktop` builds the desktop app AND its workspace
       # dependencies (types, api-client) first — those packages' dist/ is
