@@ -2,6 +2,11 @@ export class ApiClient {
   private accessToken: string | null = null
   private adminApiKey: string | null = null
   private refreshCallback: (() => Promise<string | null>) | null = null
+  // Called when an x-admin-key-only endpoint (docker-admin, mail-admin,
+  // catalog-admin) gets a 401 — these never carry a JWT, so the normal
+  // refresh-token flow can't fix them. Should resolve with a fresh key
+  // (after re-prompting the user) or null to give up.
+  private adminKeyRejectedCallback: (() => Promise<string | null>) | null = null
 
   constructor(private readonly baseUrl: string) {}
 
@@ -15,6 +20,10 @@ export class ApiClient {
 
   setRefreshCallback(cb: (() => Promise<string | null>) | null): void {
     this.refreshCallback = cb
+  }
+
+  setAdminKeyRejectedCallback(cb: (() => Promise<string | null>) | null): void {
+    this.adminKeyRejectedCallback = cb
   }
 
   private headers(): Record<string, string> {
@@ -51,8 +60,11 @@ export class ApiClient {
     return json.data as T
   }
 
-  async rest<T = unknown>(path: string, options: RequestInit & { skipAuthRefresh?: boolean } = {}): Promise<T> {
-    const { skipAuthRefresh, ...fetchOptions } = options
+  async rest<T = unknown>(
+    path: string,
+    options: RequestInit & { skipAuthRefresh?: boolean; adminKeyOnly?: boolean; _adminKeyRetried?: boolean } = {}
+  ): Promise<T> {
+    const { skipAuthRefresh, adminKeyOnly, _adminKeyRetried, ...fetchOptions } = options
     const extraHeaders: Record<string, string> = {}
     if (this.adminApiKey) extraHeaders['x-admin-key'] = this.adminApiKey
     const res = await fetch(`${this.baseUrl}${path}`, {
@@ -67,6 +79,20 @@ export class ApiClient {
         // Always skip auth refresh on the retry — if a fresh token still gets a
         // 401 the endpoint genuinely rejected the request (e.g. wrong admin key).
         return this.rest<T>(path, { ...options, skipAuthRefresh: true })
+      }
+    }
+
+    // adminKeyOnly endpoints (docker-admin, mail-admin, catalog-admin) are
+    // protected by x-admin-key, not a JWT — a 401 here means the admin key
+    // itself was rejected, so re-prompt for it instead of leaving the user
+    // stuck on a bare "Unauthorized". Gated on adminKeyOnly specifically
+    // (not skipAuthRefresh) because auth.ts also uses skipAuthRefresh for
+    // login/refresh/me/logout, where a 401 means something else entirely.
+    if (res.status === 401 && adminKeyOnly && this.adminKeyRejectedCallback && !_adminKeyRetried) {
+      const newKey = await this.adminKeyRejectedCallback()
+      if (newKey) {
+        this.adminApiKey = newKey
+        return this.rest<T>(path, { ...options, _adminKeyRetried: true })
       }
     }
 

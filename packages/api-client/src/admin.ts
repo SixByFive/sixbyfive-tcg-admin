@@ -343,14 +343,14 @@ export function createAdminApi(client: ApiClient) {
       const { q, page = 1, pageSize = 50 } = opts
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       if (q) params.set('q', q)
-      return client.rest<{ sets: CatalogSet[]; total: number }>(`/catalog-admin/sets?${params}`, { skipAuthRefresh: true })
+      return client.rest<{ sets: CatalogSet[]; total: number }>(`/catalog-admin/sets?${params}`, { skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async ingestSet(input: string, opts: { refresh?: boolean; dryRun?: boolean } = {}): Promise<IngestResult> {
       return client.rest<IngestResult>('/catalog-admin/jobs/ingest', {
         method: 'POST',
         body: JSON.stringify({ input, refresh: opts.refresh ?? false, dryRun: opts.dryRun ?? false }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
@@ -359,7 +359,7 @@ export function createAdminApi(client: ApiClient) {
       const res = await client.rest<string>('/catalog-admin/jobs/ingest-all', {
         method: 'POST',
         body: JSON.stringify({ refresh: opts.refresh ?? false, dryRun: opts.dryRun ?? false, only: opts.only }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
       // Gateway proxy calls upstream.text() so the response is a raw string of NDJSON lines.
       const text = typeof res === 'string' ? res : JSON.stringify(res)
@@ -371,19 +371,19 @@ export function createAdminApi(client: ApiClient) {
     async toggleCatalogSet(code: string): Promise<{ code: string; enabled: boolean }> {
       return client.rest<{ code: string; enabled: boolean }>(`/catalog-admin/sets/${encodeURIComponent(code)}/toggle`, {
         method: 'POST',
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
     async ensureSetTasks(code: string): Promise<void> {
-      await client.rest(`/catalog-admin/sets/${encodeURIComponent(code)}/ensure-tasks`, { method: 'POST', skipAuthRefresh: true })
+      await client.rest(`/catalog-admin/sets/${encodeURIComponent(code)}/ensure-tasks`, { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async collectPrices(opts: { set: string; dryRun?: boolean }): Promise<unknown> {
       return client.rest('/catalog-admin/jobs/collect', {
         method: 'POST',
         body: JSON.stringify({ set: opts.set, dryRun: opts.dryRun ?? false }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
@@ -391,7 +391,7 @@ export function createAdminApi(client: ApiClient) {
       return client.rest('/catalog-admin/jobs/fx-daily', {
         method: 'POST',
         body: JSON.stringify(opts),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
@@ -399,31 +399,31 @@ export function createAdminApi(client: ApiClient) {
       return client.rest('/catalog-admin/jobs/rollups', {
         method: 'POST',
         body: JSON.stringify({ scope: opts.scope ?? 'all', ...opts }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
     // ── Scheduler ──────────────────────────────────────────────────────────
 
     async getSchedulerTasks(): Promise<SchedulerTask[]> {
-      const res = await client.rest<SchedulerTask[] | { tasks: SchedulerTask[] }>('/catalog-admin/scheduler', { skipAuthRefresh: true })
+      const res = await client.rest<SchedulerTask[] | { tasks: SchedulerTask[] }>('/catalog-admin/scheduler', { skipAuthRefresh: true, adminKeyOnly: true })
       return Array.isArray(res) ? res : (res as any).tasks ?? []
     },
 
     async runSchedulerTask(id: string): Promise<void> {
-      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/run`, { method: 'POST', skipAuthRefresh: true })
+      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/run`, { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async pauseSchedulerTask(id: string): Promise<void> {
-      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/pause`, { method: 'POST', skipAuthRefresh: true })
+      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/pause`, { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async resumeSchedulerTask(id: string): Promise<void> {
-      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/resume`, { method: 'POST', skipAuthRefresh: true })
+      await client.rest(`/catalog-admin/scheduler/${encodeURIComponent(id)}/resume`, { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async seedScheduler(): Promise<void> {
-      await client.rest('/catalog-admin/scheduler/seed', { method: 'POST', skipAuthRefresh: true })
+      await client.rest('/catalog-admin/scheduler/seed', { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     // ── Service health ─────────────────────────────────────────────────────
@@ -436,7 +436,7 @@ export function createAdminApi(client: ApiClient) {
     },
 
     async getFxRates(): Promise<unknown> {
-      return client.rest('/catalog-admin/fx/rates', { skipAuthRefresh: true })
+      return client.rest('/catalog-admin/fx/rates', { skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     // ── Auth admin ─────────────────────────────────────────────────────────
@@ -447,7 +447,7 @@ export function createAdminApi(client: ApiClient) {
       await client.rest('/auth/admin/clear-brute', {
         method: 'POST',
         body: JSON.stringify({ email }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
@@ -660,21 +660,21 @@ export function createAdminApi(client: ApiClient) {
     // Protected by x-admin-key (auto-forwarded by apiClient.rest via setAdminApiKey).
 
     async getDockerServices(): Promise<DockerService[]> {
-      return client.rest<DockerService[]>('/docker-admin/services', { skipAuthRefresh: true })
+      return client.rest<DockerService[]>('/docker-admin/services', { skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async dockerAction(name: string, action: 'start' | 'stop' | 'restart'): Promise<{ ok: boolean; name: string; action: string }> {
-      return client.rest(`/docker-admin/services/${encodeURIComponent(name)}/${action}`, { method: 'POST', skipAuthRefresh: true })
+      return client.rest(`/docker-admin/services/${encodeURIComponent(name)}/${action}`, { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async dockerRestartAll(): Promise<DockerRestartAllResult> {
-      return client.rest<DockerRestartAllResult>('/docker-admin/services/restart-all', { method: 'POST', skipAuthRefresh: true })
+      return client.rest<DockerRestartAllResult>('/docker-admin/services/restart-all', { method: 'POST', skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async getDockerLogs(name: string, tail = 100): Promise<{ name: string; logs: string }> {
       return client.rest<{ name: string; logs: string }>(
         `/docker-admin/services/${encodeURIComponent(name)}/logs?tail=${tail}`,
-        { skipAuthRefresh: true }
+        { skipAuthRefresh: true, adminKeyOnly: true }
       )
     },
 
@@ -683,28 +683,28 @@ export function createAdminApi(client: ApiClient) {
     // Protected by x-admin-key (auto-forwarded by apiClient.rest via setAdminApiKey).
 
     async getMailboxes(): Promise<MailboxSummary[]> {
-      return client.rest<MailboxSummary[]>('/mail-admin/mailboxes', { skipAuthRefresh: true })
+      return client.rest<MailboxSummary[]>('/mail-admin/mailboxes', { skipAuthRefresh: true, adminKeyOnly: true })
     },
 
     async addMailbox(address: string, password: string, label?: string): Promise<{ ok: boolean; address: string }> {
       return client.rest('/mail-admin/mailboxes', {
         method: 'POST',
         body: JSON.stringify({ address, password, label }),
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
     async removeMailbox(address: string): Promise<{ ok: boolean; address: string }> {
       return client.rest(`/mail-admin/mailboxes/${encodeURIComponent(address)}`, {
         method: 'DELETE',
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
 
     async openMailboxWebmail(address: string): Promise<{ token: string; url: string }> {
       return client.rest(`/mail-admin/mailboxes/${encodeURIComponent(address)}/sso-token`, {
         method: 'POST',
-        skipAuthRefresh: true,
+        skipAuthRefresh: true, adminKeyOnly: true,
       })
     },
   }

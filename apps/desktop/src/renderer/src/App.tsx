@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AlertsProvider } from './context/AlertsContext'
+import { AdminKeyProvider } from './context/AdminKeyContext'
 import { LoginPage } from './pages/LoginPage'
 import { router } from './router'
 
@@ -43,9 +44,11 @@ export default function App(): JSX.Element {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AlertsProvider>
-          <AppContent />
-        </AlertsProvider>
+        <AdminKeyProvider>
+          <AlertsProvider>
+            <AppContent />
+          </AlertsProvider>
+        </AdminKeyProvider>
       </AuthProvider>
     </ErrorBoundary>
   )
