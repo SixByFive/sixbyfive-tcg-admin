@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "project": "sixbyfive-admin-desktop",
+  "created": "2026-08-09T00:00:00+00:00",
+  "systems": [
+    "sys-desktop-shell",
+    "sys-auth",
+    "sys-tcg-admin",
+    "sys-vision-lab",
+    "sys-kora-admin"
+  ]
+}
