@@ -26,7 +26,7 @@ Resident-level data (young people, care records) and raw tenancy/database provis
 - [ ] **Route namespacing** — prefix all existing TCG routes with `/tcg/` (e.g. `/users` → `/tcg/users`); update all `<Link>` and `navigate()` calls; no page component changes needed
 - [ ] **`packages/kora-client`** — scaffold new workspace package: KoraApiClient, auth endpoints (login, refresh, me), typed entity fetchers for orgs, homes, users
 - [ ] **`KoraAuthContext`** — new context following `AuthContext.tsx` pattern; `kora_refresh` in localStorage; checks `role === 'ADMIN'`; exposes `koraUser`, `koraLogin`, `koraLogout`
-- [ ] **Login screen update** — single email + password form fires parallel login calls to both TCG and Kora APIs; each success unlocks its section; add a "Connect Kora" fallback in the sidebar for the edge case where credentials differ between systems
+- [ ] **Login screen update** — add parallel Kora login call to the existing TCG login form; same credentials, one submit; if Kora fails the section shows a locked banner but the app still loads
 - [ ] **Kora sub-router** — `apps/desktop/src/renderer/src/router/kora.tsx`; routes under `/kora/*`
 - [ ] **Kora Dashboard page** — org count, home count, user count stat tiles; recent registrations list
 - [ ] **Kora Organisations page** — paginated table, search, view/expand row
