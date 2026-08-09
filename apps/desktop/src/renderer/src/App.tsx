@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { KoraAuthProvider } from './context/KoraAuthContext'
 import { AlertsProvider } from './context/AlertsContext'
 import { AdminKeyProvider } from './context/AdminKeyContext'
 import { LoginPage } from './pages/LoginPage'
@@ -44,11 +45,13 @@ export default function App(): JSX.Element {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AdminKeyProvider>
-          <AlertsProvider>
-            <AppContent />
-          </AlertsProvider>
-        </AdminKeyProvider>
+        <KoraAuthProvider>
+          <AdminKeyProvider>
+            <AlertsProvider>
+              <AppContent />
+            </AlertsProvider>
+          </AdminKeyProvider>
+        </KoraAuthProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

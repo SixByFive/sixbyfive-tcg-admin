@@ -6,6 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/renderer/src/*"],
+      "@sixbyfive/kora-client": ["../../packages/kora-client/src/index.ts"],
       "@tcg-admin/api-client": ["../../packages/api-client/src/index.ts"],
       "@tcg-admin/types": ["../../packages/types/src/index.ts"]
     }

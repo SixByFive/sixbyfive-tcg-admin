@@ -33,15 +33,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
-      # `...@tcg-admin/desktop` builds the desktop app AND its workspace
+      # `...@sixbyfive/desktop` builds the desktop app AND its workspace
       # dependencies (types, api-client) first — those packages' dist/ is
       # gitignored, so it must be built in CI, not just the desktop app
       # itself, or the TypeScript build fails resolving @tcg-admin/* imports.
       - name: Build workspace packages + desktop app
-        run: pnpm exec turbo run build --filter=...@tcg-admin/desktop
+        run: pnpm exec turbo run build --filter=...@sixbyfive/desktop
 
       - name: Package installer (no auto-publish — we upload it ourselves)
-        run: pnpm --filter @tcg-admin/desktop exec electron-builder --publish never
+        run: pnpm --filter @sixbyfive/desktop exec electron-builder --publish never
 
       - name: Upload installer to the update feed via SFTP
         shell: bash

@@ -114,6 +114,9 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.2.4
         version: 1.2.4(@types/react@18.3.30)(react@18.3.1)
+      '@sixbyfive/kora-client':
+        specifier: workspace:*
+        version: link:../../packages/kora-client
       '@tcg-admin/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -191,6 +194,12 @@ importers:
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
+
+  packages/kora-client:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.8.3
 
   packages/types:
     devDependencies:

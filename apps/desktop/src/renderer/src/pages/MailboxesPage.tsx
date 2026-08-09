@@ -34,7 +34,8 @@ export function MailboxesPage(): JSX.Element {
     setLoading(true)
     setLoadError('')
     try {
-      setMailboxes(await adminApi.getMailboxes())
+      const all = await adminApi.getMailboxes()
+      setMailboxes(all.filter(mb => !mb.address.endsWith('@koraplatform.co.uk')))
     } catch (err: any) {
       setLoadError(err?.message ?? 'Failed to load mailboxes')
     } finally {

@@ -1,5 +1,5 @@
 {
-  "name": "@tcg-admin/desktop",
+  "name": "@sixbyfive/desktop",
   "version": "1.0.1",
   "private": true,
   "main": "./out/main/index.js",
@@ -33,6 +33,7 @@
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
+    "@sixbyfive/kora-client": "workspace:*",
     "@tcg-admin/api-client": "workspace:*",
     "@tcg-admin/types": "workspace:*",
     "class-variance-authority": "^0.7.0",
