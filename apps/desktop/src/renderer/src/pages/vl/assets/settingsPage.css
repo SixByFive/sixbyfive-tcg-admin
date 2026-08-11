@@ -1,0 +1,32 @@
+﻿/* FILE: apps/desktop/src/renderer/src/assets/settingsPage.css */
+
+.vlSettingsPage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 740px;
+  padding: 24px;
+}
+
+.vlSettingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vlSettingsWorkspacePath {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vlSettingsWorkspaceActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

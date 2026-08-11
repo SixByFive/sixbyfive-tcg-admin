@@ -27,6 +27,14 @@ import { KoraHomesPage } from '@/pages/kora/KoraHomesPage'
 import { KoraHealthPage } from '@/pages/kora/KoraHealthPage'
 import { KoraDockerPage } from '@/pages/kora/KoraDockerPage'
 import { KoraMailboxesPage } from '@/pages/kora/KoraMailboxesPage'
+import VlDatasetPage from '@/pages/vl/DatasetPage'
+import VlProcessPage from '@/pages/vl/ProcessPage'
+import VlDatasetBrowserPage from '@/pages/vl/DatasetBrowserPage'
+import VlTrainPage from '@/pages/vl/TrainPage'
+import VlResultsPage from '@/pages/vl/ResultsPage'
+import VlTestPage from '@/pages/vl/TestPage'
+import VlSettingsPage from '@/pages/vl/SettingsPage'
+import { VaultPage } from '@/pages/VaultPage'
 
 export const router = createHashRouter([
   {
@@ -76,14 +84,22 @@ export const router = createHashRouter([
         ],
       },
 
-      // ── Vision Lab — Phase 2 ───────────────────────────────────────────────
+      // ── Vault ─────────────────────────────────────────────────────────────────
+      { path: 'vault', element: <VaultPage /> },
+
+      // ── Vision Lab ────────────────────────────────────────────────────────────
       {
         path: 'vl',
-        element: (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">Vision Lab — coming soon</p>
-          </div>
-        ),
+        children: [
+          { index: true,          element: <VlDatasetPage /> },
+          { path: 'dataset',      element: <VlDatasetPage /> },
+          { path: 'process',      element: <VlProcessPage /> },
+          { path: 'browser',      element: <VlDatasetBrowserPage /> },
+          { path: 'train',        element: <VlTrainPage /> },
+          { path: 'results',      element: <VlResultsPage /> },
+          { path: 'test',         element: <VlTestPage /> },
+          { path: 'settings',     element: <VlSettingsPage /> },
+        ],
       },
     ],
   },

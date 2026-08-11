@@ -1,0 +1,24 @@
+# FILE: vision-trainer/requirements-heimdall.txt
+#
+# Heimdall (Linux training server) dependencies.
+# Unpinned from the Windows-specific versions in requirements.txt.
+#
+# Why separate from requirements.txt:
+#   - requirements.txt pins tensorflow==2.15.1 for PyInstaller compatibility on Windows
+#   - TF 2.15.1 is not available for Python 3.12 (Linux)
+#   - Heimdall runs natively, not via PyInstaller, so version pinning is unnecessary
+#
+# UPDATED (2026-03-24)
+#
+# CHANGES:
+# - ADD: tensorboard>=2.16 for training visualisation (TensorBoard callback in train_classifier_explicit.py)
+# - NOTE: tensorboard==2.20.0 installed on Heimdall with setuptools==69.5.1 pinned due to pkg_resources dependency
+
+tensorflow>=2.16
+numpy>=1.26
+pillow>=10.0
+scikit-learn>=1.3
+matplotlib>=3.8
+pyyaml>=6.0
+tensorboard>=2.16
+setuptools==69.5.1

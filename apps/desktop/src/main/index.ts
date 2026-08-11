@@ -2,13 +2,24 @@ import { app, shell, BrowserWindow, ipcMain, Notification, dialog } from 'electr
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
+import { registerIpcHandlers as registerVlIpcHandlers } from './vl/registerIpcHandlers.js'
+import {
+  vaultList,
+  vaultGetPassword,
+  vaultSave,
+  vaultDelete,
+  vaultEncryptionStatus,
+} from './vault/vault.handlers.js'
+import { ensureWorkspaceOnStartup, getWorkspacePath } from './vl/services/workspace.service.js'
+import { startWorkspaceWatcher } from './vl/services/workspaceWatcher.service.js'
+import { flushManifest } from './vl/services/manifest.service.js'
 
 // electron-builder only bakes resources/icon.ico into packaged builds —
 // BrowserWindow needs it set explicitly so the taskbar/title bar icon
 // shows up in dev too.
 const appIcon = join(__dirname, '../../resources/icon.png')
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -37,6 +48,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 // Auto-update — checks the self-hosted feed (apps/desktop/package.json
@@ -80,9 +93,41 @@ app.whenReady().then(() => {
     }
   })
 
-  createWindow()
+  registerVlIpcHandlers()
+
+  ipcMain.handle('vault:list',             vaultList)
+  ipcMain.handle('vault:getPassword',      vaultGetPassword)
+  ipcMain.handle('vault:save',             vaultSave)
+  ipcMain.handle('vault:delete',           vaultDelete)
+  ipcMain.handle('vault:encryptionStatus', vaultEncryptionStatus)
+
+  const mainWindow = createWindow()
+
+  // Vision Lab: initialise workspace and watch for file changes
+  try {
+    const workspacePath = ensureWorkspaceOnStartup()
+    if (workspacePath) startWorkspaceWatcher(mainWindow.webContents, workspacePath)
+  } catch (err) {
+    console.warn('[VisionLab] workspace init failed:', err)
+  }
+
   initAutoUpdater()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+})
+
+// Vision Lab: flush in-memory manifest to disk before exit
+app.on('before-quit', (e) => {
+  e.preventDefault()
+  ;(async () => {
+    try {
+      const wp = getWorkspacePath()
+      await flushManifest(wp)
+    } catch {
+      // workspace may never have been initialised — that's fine
+    } finally {
+      app.exit(0)
+    }
+  })()
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

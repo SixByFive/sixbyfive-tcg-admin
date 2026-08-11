@@ -1,0 +1,124 @@
+﻿/* FILE: apps/desktop/src/renderer/src/assets/infrastructureSettings.css */
+
+.infraSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 680px;
+}
+
+.infraSettings__sectionTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin: 0 0 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.infraSettings__groupLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 8px;
+}
+
+/* ── Mode selector ── */
+
+.infraSettings__modeList { display: flex; flex-direction: column; gap: 8px; }
+
+.infraSettings__modeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border-tertiary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.infraSettings__modeOption:hover {
+  border-color: var(--color-border-secondary);
+  background: var(--color-background-secondary);
+}
+.infraSettings__modeOption--selected {
+  border-color: var(--color-border-info);
+  background: var(--color-background-info);
+}
+.infraSettings__modeOption input[type="radio"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-text-info);
+}
+.infraSettings__modeLabel { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.infraSettings__modeDesc  { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+
+/* ── Fields ── */
+
+.infraSettings__row   { display: flex; gap: 12px; margin-bottom: 12px; }
+.infraSettings__field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.infraSettings__field--narrow { flex: 0 0 80px; }
+
+.infraSettings__fieldLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.infraSettings__fieldHint         { font-size: 11px; font-weight: 400; color: var(--color-text-tertiary); }
+.infraSettings__fieldHint--inline { display: inline; font-size: 11px; }
+
+/* ── Actions ── */
+
+.infraSettings__actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+.infraSettings__rebootstrapLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.infraSettings__rebootstrapLink:hover    { color: var(--color-text-secondary); }
+.infraSettings__rebootstrapLink:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Test result ── */
+
+.infraSettings__testResult {
+  margin-top: 10px;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+}
+.infraSettings__testResult--ok   { background: var(--color-background-success); color: var(--color-text-success); }
+.infraSettings__testResult--fail { background: var(--color-background-danger);  color: var(--color-text-danger); }
+
+/* ── Bootstrap log ── */
+
+.infraSettings__bootstrapLog {
+  margin-top: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+.infraSettings__bootstrapLogLine { white-space: pre-wrap; word-break: break-all; }
+
+/* ── Save bar ── */
+
+.infraSettings__saveBar { display: flex; align-items: center; gap: 12px; padding-top: 4px; }
+.infraSettings__saveMsg { font-size: 12px; color: var(--color-text-secondary); }

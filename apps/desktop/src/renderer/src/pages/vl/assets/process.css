@@ -1,0 +1,119 @@
+/* FILE: apps/desktop/src/renderer/src/pages/vl/assets/process.css */
+
+/* ---- LIST ITEM LAYOUT ---- */
+.vlProcItem {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border-radius: 0.625rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  cursor: pointer;
+  color: hsl(var(--foreground));
+  min-height: 96px;
+  transition: border-color 80ms ease, background 80ms ease;
+}
+
+.vlProcItem:hover {
+  border-color: hsl(var(--ring) / 0.4);
+  background: hsl(var(--accent));
+}
+
+.vlProcItem.active {
+  outline: 2px solid hsl(var(--primary) / 0.5);
+  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.08);
+  background: hsl(var(--primary) / 0.06);
+}
+
+/* Thumbnail cell */
+.vlProcThumbWrap {
+  width: 78px;
+  height: 96px;
+  flex: 0 0 auto;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+}
+
+.vlProcThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: hsl(var(--background));
+  border-radius: 0.375rem;
+  display: block;
+}
+
+/* Meta column */
+.vlProcItemMeta {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.vlProcItemTitle {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: hsl(var(--foreground));
+}
+
+.vlProcItemSub {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vlProcItemFile {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: hsl(var(--foreground) / 0.85);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  padding: 3px 7px;
+  border-radius: 0.375rem;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Badges column */
+.vlProcBadges {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  align-content: center;
+  padding-left: 8px;
+}
+
+.vlProcBadgesRow {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.vlBadge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.vlBadge.ok { color: hsl(var(--foreground)); }

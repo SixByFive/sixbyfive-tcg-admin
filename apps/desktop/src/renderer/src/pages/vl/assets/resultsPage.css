@@ -1,0 +1,182 @@
+﻿/* FILE: apps/desktop/src/renderer/src/assets/resultsPage.css */
+
+.vlResultsPage {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+/* Model overview cards */
+.vlModelCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 800px) {
+  .vlModelCards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vlModelOverview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vlModelOverviewRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.vlModelOverviewLabel {
+  font-size: 12px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vlModelOverviewValue {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Accuracy bars */
+.vlAccRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.vlAccLabel {
+  width: 50px;
+  text-align: right;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.vlAccBar {
+  flex: 1;
+  height: 18px;
+  background: hsl(var(--muted));
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.vlAccBarFill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.6), rgba(34, 197, 94, 0.6));
+  transition: width 0.4s ease;
+}
+
+.vlAccValue {
+  width: 55px;
+  font-weight: 600;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Run history table */
+.vlRunsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.vlRunsTable th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.45;
+  padding: 6px 10px;
+  border-bottom: 1px solid hsl(var(--border));
+  font-weight: 500;
+}
+
+.vlRunsTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  vertical-align: middle;
+}
+
+.vlRunsTable tr:hover td {
+  background: hsl(var(--accent));
+}
+
+.vlRunsTable .mono {
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+
+.vlRunStatusDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.vlRunStatusDot.ok { background: rgb(34, 197, 94); }
+.vlRunStatusDot.fail { background: rgb(239, 68, 68); }
+
+/* Metric highlight */
+.vlMetricHighlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vlMetricHighlight.good { color: rgb(34, 197, 94); }
+.vlMetricHighlight.mid { color: rgb(234, 179, 8); }
+.vlMetricHighlight.low { color: rgb(239, 68, 68); }
+
+/* Empty state */
+.vlResultsEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 12px;
+  text-align: center;
+}
+
+.vlResultsEmptyIcon {
+  font-size: 40px;
+  opacity: 0.2;
+}
+
+/* Config preview */
+.vlConfigGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.vlConfigItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vlConfigKey {
+  font-size: 11px;
+  opacity: 0.4;
+  text-transform: lowercase;
+}
+
+.vlConfigVal {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

@@ -50,7 +50,7 @@ export function DashboardPage(): JSX.Element {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-foreground">Dashboard</h1>
+      <h1 className="mb-6 text-2xl font-bold text-foreground">TCG Dashboard</h1>
 
       {!stats ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

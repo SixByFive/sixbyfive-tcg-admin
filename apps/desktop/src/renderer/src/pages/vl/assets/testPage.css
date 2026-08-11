@@ -1,0 +1,335 @@
+/* FILE: apps/desktop/src/renderer/src/pages/vl/assets/testPage.css */
+
+.vlTestPage {
+  /* calc(100vh - 48px) accounts for shell p-6 (24px) top + bottom */
+  height: calc(100vh - 48px);
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.vlTestSplit {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 14px;
+  align-items: stretch;
+}
+
+@media (max-width: 1000px) {
+  .vlTestSplit { grid-template-columns: 1fr; }
+}
+
+/* ---- Left: Image drop + preview ---- */
+.vlTestLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.vlTestDropArea {
+  flex: 1;
+  min-height: 200px;
+  border-radius: 0.75rem;
+  border: 1px dashed hsl(var(--border));
+  background: hsl(var(--muted));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 100ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.vlTestDropArea:hover {
+  border-color: hsl(var(--ring) / 0.4);
+  background: hsl(var(--accent));
+}
+
+.vlTestDropArea.over {
+  border-color: hsl(var(--primary) / 0.6);
+  background: hsl(var(--primary) / 0.07);
+  transform: scale(1.005);
+}
+
+.vlTestDropArea.hasImage {
+  border-style: solid;
+  border-color: hsl(var(--border));
+  cursor: default;
+  padding: 14px;
+}
+
+.vlTestDropIcon {
+  font-size: 40px;
+  opacity: 0.3;
+  line-height: 1;
+}
+
+.vlTestDropLabel {
+  font-weight: 700;
+  font-size: 15px;
+  opacity: 0.6;
+  color: hsl(var(--foreground));
+}
+
+.vlTestDropHint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.vlTestPreviewImg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0.625rem;
+  display: block;
+}
+
+/* ---- Right: Results ---- */
+.vlTestRight {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.vlTestModelRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.vlTestModelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 0.625rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+
+.vlTestModelBadge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vlTestModelBadge .dot.ready {
+  background: rgba(80, 200, 120, 0.9);
+  box-shadow: 0 0 0 3px rgba(80, 200, 120, 0.2);
+}
+
+.vlTestModelBadge .dot.missing {
+  background: rgba(255, 100, 100, 0.7);
+  box-shadow: 0 0 0 3px rgba(255, 100, 100, 0.15);
+}
+
+.vlTestModelBadge .dot.loading {
+  background: hsl(var(--primary) / 0.8);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+  animation: vlPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vlPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.vlTestModelBadge .modelName { text-transform: capitalize; }
+
+.vlTestModelBadge .modelMeta {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+}
+
+/* Result sections */
+.vlTestResultSection {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--card));
+  overflow: hidden;
+}
+
+.vlTestResultHeader {
+  padding: 12px 14px;
+  border-bottom: 1px solid hsl(var(--border));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vlTestResultTitle {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  color: hsl(var(--foreground));
+}
+
+.vlTestResultTime {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vlTestResultBody { padding: 10px; }
+
+/* Prediction row */
+.vlTestPredRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  transition: background 100ms ease;
+}
+
+.vlTestPredRow:hover { background: hsl(var(--accent)); }
+
+.vlTestPredRow.top {
+  border-color: hsl(var(--primary) / 0.25);
+  background: hsl(var(--primary) / 0.06);
+}
+
+.vlTestPredRank {
+  width: 28px;
+  height: 28px;
+  border-radius: 0.375rem;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 13px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.vlTestPredRow.top .vlTestPredRank {
+  background: hsl(var(--primary) / 0.2);
+  border-color: hsl(var(--primary) / 0.4);
+  color: hsl(var(--foreground));
+}
+
+.vlTestPredInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vlTestPredLabel {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: hsl(var(--foreground));
+}
+
+.vlTestPredBar {
+  height: 6px;
+  border-radius: 3px;
+  background: hsl(var(--muted));
+  overflow: hidden;
+}
+
+.vlTestPredBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: hsl(var(--primary) / 0.7);
+  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vlTestPredRow.top .vlTestPredBarFill {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--primary) / 0.85),
+    rgba(80, 200, 120, 0.85)
+  );
+}
+
+.vlTestPredConf {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+  color: hsl(var(--foreground));
+}
+
+/* Running state */
+.vlTestRunning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+
+.vlTestSpinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  border-radius: 50%;
+  animation: vlSpin 0.8s linear infinite;
+}
+
+@keyframes vlSpin { to { transform: rotate(360deg); } }
+
+/* Clear button overlay */
+.vlTestClearBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 6px 12px;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.9);
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 100ms ease;
+}
+
+.vlTestClearBtn:hover { background: hsl(var(--card)); }
+
+/* Empty state */
+.vlTestEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
+.vlTestEmptyIcon {
+  font-size: 32px;
+  opacity: 0.25;
+}

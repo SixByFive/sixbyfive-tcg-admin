@@ -1,0 +1,37 @@
+{
+  "seed": 1337,
+
+  "image_size": 224,
+  "batch_size": 32,
+
+  "identity": {
+    "enabled": true,
+    "epochs": 35,
+    "learning_rate": 0.0003,
+    "fine_tune_at_epoch": 10,
+    "fine_tune_lr": 0.00003,
+    "label_smoothing": 0.05,
+    "dropout": 0.3
+  },
+
+  "finish": {
+    "enabled": true,
+    "epochs": 50,
+    "learning_rate": 0.0003,
+    "fine_tune_at_epoch": 15,
+    "fine_tune_lr": 0.00003,
+    "label_smoothing": 0.02,
+    "dropout": 0.15
+  },
+
+  "export": {
+    "tflite_fp16": true,
+    "tflite_int8": false,
+    "tfjs": true
+  },
+
+  "health": {
+    "min_images_per_class_warn": 1,
+    "min_classes_warn": 2
+  }
+}

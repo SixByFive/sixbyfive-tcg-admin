@@ -9,3 +9,8 @@ android
 ios
 /apps/desktop/release
 /apps/admin-mobile/.expo
+
+# Vision trainer — PyInstaller output and local Python env
+/vision-trainer/dist/
+/vision-trainer/build/
+/vision-trainer/.venv/

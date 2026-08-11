@@ -20,12 +20,18 @@ import {
   Server,
   Container,
   Mail,
-  LogOut,
   Cpu,
   HeartPulse,
   Building2,
   Home,
   Activity,
+  Images,
+  ScanLine,
+  Dumbbell,
+  BarChart2,
+  FlaskConical,
+  Settings,
+  KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
@@ -114,25 +120,73 @@ const koraNavGroups: NavGroup[] = [
   {
     label: 'Infrastructure',
     items: [
-      { to: '/kora/health',     label: 'API Health', icon: Activity },
-      { to: '/kora/docker',     label: 'Docker',     icon: Container },
-      { to: '/kora/mailboxes',  label: 'Webmail',    icon: Mail },
+      { to: '/kora/health',    label: 'API Health', icon: Activity },
+      { to: '/kora/docker',    label: 'Docker',     icon: Container },
+      { to: '/kora/mailboxes', label: 'Webmail',    icon: Mail },
     ],
   },
 ]
 
-type Section = 'tcg' | 'kora' | 'vl'
-
-const sections: { id: Section; label: string; icon: React.ElementType; root: string }[] = [
-  { id: 'tcg',  label: 'TCG Admin',   icon: ShoppingBag, root: '/tcg' },
-  { id: 'kora', label: 'Kora Admin',  icon: HeartPulse,  root: '/kora' },
-  { id: 'vl',   label: 'Vision Lab',  icon: Cpu,         root: '/vl' },
+const vlNavGroups: NavGroup[] = [
+  {
+    label: 'Data',
+    items: [
+      { to: '/vl/dataset', label: 'Dataset', icon: Images,        end: true },
+      { to: '/vl/process', label: 'Process', icon: ScanLine },
+      { to: '/vl/browser', label: 'Browser', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Training',
+    items: [
+      { to: '/vl/train',   label: 'Train',   icon: Dumbbell },
+      { to: '/vl/results', label: 'Results', icon: BarChart2 },
+    ],
+  },
+  {
+    label: 'Inference',
+    items: [
+      { to: '/vl/test', label: 'Test', icon: FlaskConical },
+    ],
+  },
+  {
+    label: 'Configuration',
+    items: [
+      { to: '/vl/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ]
+
+const vaultNavGroups: NavGroup[] = [
+  {
+    label: 'Credentials',
+    items: [
+      { to: '/vault', label: 'All entries', icon: KeyRound, end: true },
+    ],
+  },
+]
+
+type Section = 'tcg' | 'kora' | 'vl' | 'vault'
+
+const sections: { id: Section; label: string; shortLabel: string; icon: React.ElementType; root: string }[] = [
+  { id: 'tcg',   label: 'TCG Admin',  shortLabel: 'TCG',   icon: ShoppingBag, root: '/tcg' },
+  { id: 'kora',  label: 'Kora Admin', shortLabel: 'Kora',  icon: HeartPulse,  root: '/kora' },
+  { id: 'vl',    label: 'Vision Lab', shortLabel: 'VL',    icon: Cpu,         root: '/vl' },
+  { id: 'vault', label: 'Vault',      shortLabel: 'Vault', icon: KeyRound,    root: '/vault' },
+]
+
+const sectionMeta: Record<Section, { title: string; sub: string }> = {
+  tcg:   { title: 'TCG',        sub: 'Collection Management' },
+  kora:  { title: 'Kora',       sub: 'Care platform admin' },
+  vl:    { title: 'Vision Lab', sub: 'ML training pipeline' },
+  vault: { title: 'Vault',      sub: 'Logins & passwords' },
+}
 
 function useActiveSection(): Section {
   const { pathname } = useLocation()
-  if (pathname.startsWith('/kora')) return 'kora'
-  if (pathname.startsWith('/vl')) return 'vl'
+  if (pathname.startsWith('/kora'))  return 'kora'
+  if (pathname.startsWith('/vl'))    return 'vl'
+  if (pathname.startsWith('/vault')) return 'vault'
   return 'tcg'
 }
 
@@ -141,41 +195,75 @@ export function Sidebar(): JSX.Element {
   const { counts } = useAlerts()
   const navigate = useNavigate()
   const activeSection = useActiveSection()
+  const { title, sub } = sectionMeta[activeSection]
 
   const navGroups =
-    activeSection === 'tcg'  ? tcgNavGroups  :
-    activeSection === 'kora' ? koraNavGroups :
-    []
+    activeSection === 'tcg'   ? tcgNavGroups   :
+    activeSection === 'kora'  ? koraNavGroups  :
+    activeSection === 'vault' ? vaultNavGroups :
+    vlNavGroups
+
+  const initials = (user?.username ?? user?.email ?? '?').slice(0, 2).toUpperCase()
 
   return (
-    <aside className="flex h-full w-52 flex-col border-r border-border bg-card">
+    <aside className="flex h-full">
 
-      {/* Section switcher */}
-      <div className="flex gap-1 border-b border-border p-2">
-        {sections.map(({ id, label, icon: Icon, root }) => (
-          <button
-            key={id}
-            onClick={() => navigate(root)}
-            title={label}
-            className={cn(
-              'flex flex-1 flex-col items-center gap-1 rounded-md py-2 text-[10px] font-medium transition-colors',
-              activeSection === id
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            <span className="leading-none">{id === 'tcg' ? 'TCG' : id === 'kora' ? 'Kora' : 'Vision'}</span>
-          </button>
-        ))}
+      {/* Activity bar */}
+      <div
+        className="flex w-[52px] shrink-0 flex-col items-center border-r border-border py-3"
+        style={{ backgroundColor: 'hsl(var(--act-bar))' }}
+      >
+        <span className="mb-5 select-none text-[11px] font-bold tracking-tight text-primary">
+          SBF
+        </span>
+
+        <div className="flex w-full flex-1 flex-col gap-0.5">
+          {sections.map(({ id, label, shortLabel, icon: Icon, root }) => (
+            <button
+              key={id}
+              onClick={() => navigate(root)}
+              title={label}
+              className={cn(
+                'flex w-full flex-col items-center gap-1 border-l-2 py-2.5 text-[8px] font-semibold uppercase tracking-[0.1em] transition-colors',
+                activeSection === id
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-transparent text-muted-foreground/40 hover:bg-accent/50 hover:text-muted-foreground'
+              )}
+            >
+              <Icon className="h-[18px] w-[18px]" />
+              <span>{shortLabel}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col items-center gap-2.5">
+          {user && (
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-[9px] font-semibold text-primary transition-colors hover:bg-primary/20"
+            >
+              {initials}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Section nav */}
-      <nav className="flex flex-1 flex-col overflow-y-auto p-2">
-        {navGroups.length > 0 ? (
-          navGroups.map((group, gi) => (
-            <div key={group.label} className={cn('flex flex-col gap-0.5', gi > 0 && 'mt-4')}>
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+      {/* Nav panel */}
+      <nav className="flex w-[196px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+        <div className="px-4 pb-3.5 pt-5">
+          <h2 className="text-[20px] font-semibold leading-tight tracking-tight text-foreground">
+            {title}
+          </h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>
+        </div>
+
+        <div className="h-px shrink-0 bg-border" />
+
+        <div className="flex-1 overflow-y-auto py-2">
+          {navGroups.map((group, gi) => (
+            <div key={group.label} className={cn(gi > 0 && 'mt-3')}>
+              <p className="px-4 pb-0.5 pt-2.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/40">
                 {group.label}
               </p>
               {group.items.map(({ to, label, icon: Icon, end, badge }) => {
@@ -187,50 +275,31 @@ export function Sidebar(): JSX.Element {
                     end={end}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                        'flex items-center gap-2.5 border-l-2 py-[7px] pr-4 text-[13px] transition-colors',
                         isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                          ? 'border-primary bg-primary/5 pl-[14px] font-medium text-foreground'
+                          : 'border-transparent pl-4 text-muted-foreground hover:bg-accent/40 hover:text-foreground'
                       )
                     }
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="flex-1">{label}</span>
-                    {count > 0 && (
-                      <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
-                        {count > 99 ? '99+' : count}
-                      </span>
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn('h-[15px] w-[15px] shrink-0', isActive && 'text-primary')} />
+                        <span className="flex-1">{label}</span>
+                        {count > 0 && (
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
+                      </>
                     )}
                   </NavLink>
                 )
               })}
             </div>
-          ))
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </div>
-        )}
-      </nav>
-
-      {/* User footer */}
-      {user && (
-        <div className="border-t border-border p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium leading-tight">{user.username ?? user.email}</p>
-              <p className="text-xs text-muted-foreground">{user.role}</p>
-            </div>
-            <button
-              onClick={logout}
-              title="Sign out"
-              className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          ))}
         </div>
-      )}
+      </nav>
     </aside>
   )
 }

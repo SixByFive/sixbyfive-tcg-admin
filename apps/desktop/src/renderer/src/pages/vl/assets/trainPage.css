@@ -1,0 +1,110 @@
+﻿/* FILE: apps/desktop/src/renderer/src/assets/trainPage.css
+ *
+ * UPDATED (2026-03-04)
+ *
+ * CHANGES:
+ * - FIX: Prevent page from overflowing the window (use 100vh + overflow hidden)
+ * - FIX: Train layout uses flex with min-height:0 so inner scroll areas work
+ * - ADD: Live console card becomes a flex column and the log becomes the scroll container
+ */
+
+.vlTrainPage {
+  /* calc(100vh - 48px) accounts for shell p-6 (24px) top + bottom */
+  height: calc(100vh - 48px);
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The outer Card should fill the available space */
+.vlTrainPage > .vlCard {
+  flex: 1;
+  min-height: 0; /* ✅ critical: allows children to become scroll containers */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card body must be allowed to shrink */
+.vlTrainPage > .vlCard > .vlCardBody {
+  flex: 1;
+  min-height: 0; /* ✅ critical */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Split layout: left options + right console */
+.vlTrainSplit {
+  flex: 1;
+  min-height: 0; /* ✅ critical */
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 14px;
+}
+
+/* Left column should scroll if it ever gets too tall (optional) */
+.vlTrainLeftCol {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+/* ✅ Console card must become a flex column so header stays fixed */
+.vlTrainConsoleCard {
+  min-height: 0; /* ✅ critical */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the console card body is what contains the log */
+.vlTrainConsoleCard > .vlCardBody {
+  flex: 1;
+  min-height: 0; /* ✅ critical */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ✅ This is the dedicated scroll area */
+.vlTrainLog {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 0.625rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+}
+
+/* Log lines */
+.vlTrainLogLine {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap; /* wrap long lines */
+  word-break: break-word;
+  padding: 2px 0;
+}
+
+.vlTrainLogLine.err {
+  color: rgba(255, 140, 140, 0.95);
+}
+
+/* Top right header actions */
+.vlTrainTopRight {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vlTrainConsoleActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Optional hint spacing */
+.vlTrainFooterHint {
+  margin-top: 12px;
+}
