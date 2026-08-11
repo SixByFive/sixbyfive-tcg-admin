@@ -1,6 +1,8 @@
 {
   "name": "@sixbyfive/desktop",
-  "version": "2.0.0",
+  "version": "2.0.1",
+  "description": "SixByFive internal admin desktop app",
+  "author": "SixByFive",
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
@@ -12,7 +14,7 @@
   "build": {
     "appId": "com.sixbyfive.tcgadmin",
     "productName": "SixByFive Admin",
-    "npmRebuild": true,
+    "npmRebuild": false,
     "extraResources": [
       {
         "from": "../../vision-trainer/dist/vision-trainer",
