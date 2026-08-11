@@ -15,7 +15,7 @@
     "npmRebuild": true,
     "extraResources": [
       {
-        "from": "../../../../SBF-Vision-Lab/vision-trainer/dist/vision-trainer",
+        "from": "../../vision-trainer/dist/vision-trainer",
         "to": "vision-trainer",
         "filter": ["**/*"]
       }
