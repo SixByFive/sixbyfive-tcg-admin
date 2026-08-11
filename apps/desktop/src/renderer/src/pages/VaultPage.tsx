@@ -137,7 +137,7 @@ function EntryModal({
 
           {([
             ['name',     'Name *',    'text',     'e.g. GitHub, AWS Console'],
-            ['url',      'URL',       'url',      'https://...'],
+            ['url',      'URL',       'text',     'https://... or 192.168.x.x'],
             ['username', 'Username / email', 'text', ''],
             ['category', 'Category',  'text',     'e.g. Work, Personal'],
           ] as const).map(([field, label, type, placeholder]) => (
