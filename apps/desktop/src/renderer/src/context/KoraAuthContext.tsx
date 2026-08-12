@@ -5,7 +5,9 @@ import type { KoraUser } from '@sixbyfive/kora-client'
 interface KoraAuthContextValue {
   koraUser: KoraUser | null
   isKoraLoading: boolean
+  koraError: string | null
   koraLogin: (email: string, password: string) => Promise<void>
+  retryKoraAuth: () => Promise<void>
   koraLogout: () => void
 }
 
@@ -15,6 +17,7 @@ const REFRESH_KEY = 'kora_refresh'
 export function KoraAuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [koraUser, setKoraUser] = useState<KoraUser | null>(null)
   const [isKoraLoading, setIsKoraLoading] = useState(true)
+  const [koraError, setKoraError] = useState<string | null>(null)
 
   function doLogout() {
     const stored = localStorage.getItem(REFRESH_KEY)
@@ -40,42 +43,63 @@ export function KoraAuthProvider({ children }: { children: ReactNode }): JSX.Ele
     })
   }
 
-  useEffect(() => {
+  async function attemptRefresh(): Promise<void> {
     const refreshToken = localStorage.getItem(REFRESH_KEY)
-    if (!refreshToken) { setIsKoraLoading(false); return }
+    if (!refreshToken) return
+    try {
+      const { accessToken, refreshToken: newRefresh } = await koraAuthApi.refresh(refreshToken)
+      koraClient.setAccessToken(accessToken)
+      localStorage.setItem(REFRESH_KEY, newRefresh)
+      installRefresh()
+      const me = await koraAuthApi.me()
+      if (!me.isPlatformAdmin) {
+        doLogout()
+        setKoraError('This account does not have Kora platform admin access.')
+        return
+      }
+      setKoraUser(me)
+      setKoraError(null)
+    } catch (err) {
+      localStorage.removeItem(REFRESH_KEY)
+      setKoraError((err as Error).message || 'Failed to connect to Kora.')
+    }
+  }
 
-    koraAuthApi.refresh(refreshToken)
-      .then(({ accessToken, refreshToken: newRefresh }) => {
-        koraClient.setAccessToken(accessToken)
-        localStorage.setItem(REFRESH_KEY, newRefresh)
-        installRefresh()
-        return koraAuthApi.me()
-      })
-      .then((me) => {
-        if (!me.isPlatformAdmin) { doLogout(); return }
-        setKoraUser(me)
-      })
-      .catch(() => localStorage.removeItem(REFRESH_KEY))
-      .finally(() => setIsKoraLoading(false))
+  useEffect(() => {
+    attemptRefresh().finally(() => setIsKoraLoading(false))
   }, [])
 
   async function koraLogin(email: string, password: string): Promise<void> {
-    const { accessToken, refreshToken } = await koraAuthApi.login(email, password)
-    koraClient.setAccessToken(accessToken)
-    localStorage.setItem(REFRESH_KEY, refreshToken)
-    installRefresh()
-    const me = await koraAuthApi.me()
-    if (!me.isPlatformAdmin) {
-      doLogout()
-      throw new Error('Kora platform admin access required.')
+    try {
+      const { accessToken, refreshToken } = await koraAuthApi.login(email, password)
+      koraClient.setAccessToken(accessToken)
+      localStorage.setItem(REFRESH_KEY, refreshToken)
+      installRefresh()
+      const me = await koraAuthApi.me()
+      if (!me.isPlatformAdmin) {
+        doLogout()
+        setKoraError('This account does not have Kora platform admin access.')
+        throw new Error('Kora platform admin access required.')
+      }
+      setKoraUser(me)
+      setKoraError(null)
+    } catch (err) {
+      const msg = (err as Error).message || 'Failed to connect to Kora.'
+      setKoraError(msg)
+      throw err
     }
-    setKoraUser(me)
+  }
+
+  async function retryKoraAuth(): Promise<void> {
+    setIsKoraLoading(true)
+    await attemptRefresh()
+    setIsKoraLoading(false)
   }
 
   function koraLogout() { doLogout() }
 
   return (
-    <KoraAuthContext.Provider value={{ koraUser, isKoraLoading, koraLogin, koraLogout }}>
+    <KoraAuthContext.Provider value={{ koraUser, isKoraLoading, koraError, koraLogin, retryKoraAuth, koraLogout }}>
       {children}
     </KoraAuthContext.Provider>
   )
@@ -86,3 +110,4 @@ export function useKoraAuth(): KoraAuthContextValue {
   if (!ctx) throw new Error('useKoraAuth must be used within KoraAuthProvider')
   return ctx
 }
+
