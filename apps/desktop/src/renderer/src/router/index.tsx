@@ -35,13 +35,18 @@ import VlResultsPage from '@/pages/vl/ResultsPage'
 import VlTestPage from '@/pages/vl/TestPage'
 import VlSettingsPage from '@/pages/vl/SettingsPage'
 import { VaultPage } from '@/pages/VaultPage'
+import { StatusBoardPage } from '@/pages/StatusBoardPage'
+import { SnippetsPage } from '@/pages/SnippetsPage'
+import { ReleaseManagerPage } from '@/pages/ReleaseManagerPage'
+import { SshTerminalPage } from '@/pages/ssh/SshTerminalPage'
+import { SshConnectionsPage } from '@/pages/ssh/SshConnectionsPage'
 
 export const router = createHashRouter([
   {
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <Navigate to="/tcg" replace /> },
+      { index: true, element: <Navigate to="/status" replace /> },
 
       // ── TCG Admin ──────────────────────────────────────────────────────────
       {
@@ -86,6 +91,25 @@ export const router = createHashRouter([
 
       // ── Vault ─────────────────────────────────────────────────────────────────
       { path: 'vault', element: <VaultPage /> },
+
+      // ── Status ────────────────────────────────────────────────────────────────
+      { path: 'status', element: <StatusBoardPage /> },
+
+      // ── Snippets ──────────────────────────────────────────────────────────────
+      { path: 'snippets', element: <SnippetsPage /> },
+
+      // ── Release Manager ───────────────────────────────────────────────────────
+      { path: 'release', element: <ReleaseManagerPage /> },
+
+      // ── SSH Terminal ──────────────────────────────────────────────────────────
+      {
+        path: 'ssh',
+        children: [
+          { index: true,         element: <SshTerminalPage /> },
+          { path: 'terminal',    element: <SshTerminalPage /> },
+          { path: 'connections', element: <SshConnectionsPage /> },
+        ],
+      },
 
       // ── Vision Lab ────────────────────────────────────────────────────────────
       {

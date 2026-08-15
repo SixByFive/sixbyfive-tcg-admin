@@ -32,10 +32,17 @@ import {
   FlaskConical,
   Settings,
   KeyRound,
+  Signal,
+  Braces,
+  Rocket,
+  TerminalSquare,
+  X,
 } from 'lucide-react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth, getTcgServiceAccount, saveTcgServiceAccount, authenticateTcg } from '@/context/AuthContext'
 import { useAlerts, type AlertCounts } from '@/context/AlertsContext'
+import { usePermissions } from '@/context/PermissionsContext'
 
 interface NavItem {
   to: string
@@ -43,6 +50,7 @@ interface NavItem {
   icon: React.ElementType
   end?: boolean
   badge?: keyof AlertCounts
+  permission?: string  // if set, item is hidden unless can(permission)
 }
 
 interface NavGroup {
@@ -73,8 +81,8 @@ const tcgNavGroups: NavGroup[] = [
       { to: '/tcg/trades',        label: 'Trades',        icon: ArrowLeftRight },
       { to: '/tcg/marketplace',   label: 'Marketplace',   icon: Store },
       { to: '/tcg/subscriptions', label: 'Subscriptions', icon: CreditCard },
-      { to: '/tcg/financials',    label: 'Financials',    icon: BarChart3 },
-      { to: '/tcg/withdrawals',   label: 'Withdrawals',   icon: Wallet,     badge: 'withdrawals' },
+      { to: '/tcg/financials',    label: 'Financials',    icon: BarChart3,  permission: 'tcg.financial' },
+      { to: '/tcg/withdrawals',   label: 'Withdrawals',   icon: Wallet,     badge: 'withdrawals', permission: 'tcg.financial' },
       { to: '/tcg/proof-queue',   label: 'Proof Queue',   icon: FileCheck,  badge: 'proofQueue' },
     ],
   },
@@ -97,8 +105,8 @@ const tcgNavGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { to: '/tcg/services',  label: 'Services', icon: Server },
-      { to: '/tcg/docker',    label: 'Docker',   icon: Container },
-      { to: '/tcg/mailboxes', label: 'Webmail',  icon: Mail },
+      { to: '/tcg/docker',    label: 'Docker',   icon: Container, permission: 'tcg.financial' },
+      { to: '/tcg/mailboxes', label: 'Webmail',  icon: Mail,      permission: 'tcg.financial' },
     ],
   },
 ]
@@ -157,6 +165,15 @@ const vlNavGroups: NavGroup[] = [
   },
 ]
 
+const snippetsNavGroups: NavGroup[] = [
+  {
+    label: 'Library',
+    items: [
+      { to: '/snippets', label: 'All snippets', icon: Braces, end: true },
+    ],
+  },
+]
+
 const vaultNavGroups: NavGroup[] = [
   {
     label: 'Credentials',
@@ -166,41 +183,136 @@ const vaultNavGroups: NavGroup[] = [
   },
 ]
 
-type Section = 'tcg' | 'kora' | 'vl' | 'vault'
+const statusNavGroups: NavGroup[] = [
+  {
+    label: 'Monitoring',
+    items: [
+      { to: '/status', label: 'Status Board', icon: Signal },
+    ],
+  },
+]
 
-const sections: { id: Section; label: string; shortLabel: string; icon: React.ElementType; root: string }[] = [
-  { id: 'tcg',   label: 'TCG Admin',  shortLabel: 'TCG',   icon: ShoppingBag, root: '/tcg' },
-  { id: 'kora',  label: 'Kora Admin', shortLabel: 'Kora',  icon: HeartPulse,  root: '/kora' },
-  { id: 'vl',    label: 'Vision Lab', shortLabel: 'VL',    icon: Cpu,         root: '/vl' },
-  { id: 'vault', label: 'Vault',      shortLabel: 'Vault', icon: KeyRound,    root: '/vault' },
+const sshNavGroups: NavGroup[] = [
+  {
+    label: 'Sessions',
+    items: [
+      { to: '/ssh/terminal',    label: 'Terminal',    icon: TerminalSquare },
+      { to: '/ssh/connections', label: 'Connections', icon: Settings },
+    ],
+  },
+]
+
+const releaseNavGroups: NavGroup[] = [
+  {
+    label: 'Deployment',
+    items: [
+      { to: '/release', label: 'Release Manager', icon: Rocket, end: true },
+    ],
+  },
+]
+
+type Section = 'tcg' | 'kora' | 'vl' | 'vault' | 'status' | 'snippets' | 'release' | 'ssh'
+
+const sections: { id: Section; label: string; shortLabel: string; icon: React.ElementType; root: string; permission?: string }[] = [
+  { id: 'status',   label: 'Status',     shortLabel: 'Status',   icon: Signal,         root: '/status' },
+  { id: 'tcg',     label: 'TCG Admin',  shortLabel: 'TCG',      icon: ShoppingBag,    root: '/tcg',           permission: 'tcg' },
+  { id: 'kora',    label: 'Kora',       shortLabel: 'Kora',     icon: HeartPulse,     root: '/kora',          permission: 'kora' },
+  { id: 'vl',      label: 'Vision Lab', shortLabel: 'VL',       icon: Cpu,            root: '/vl',            permission: 'vl' },
+  { id: 'vault',   label: 'Vault',      shortLabel: 'Vault',    icon: KeyRound,       root: '/vault' },
+  { id: 'snippets',label: 'Snippets',   shortLabel: 'Snippets', icon: Braces,         root: '/snippets' },
+  { id: 'release', label: 'Releases',   shortLabel: 'Release',  icon: Rocket,         root: '/release' },
+  { id: 'ssh',     label: 'SSH',        shortLabel: 'SSH',      icon: TerminalSquare, root: '/ssh/terminal' },
 ]
 
 const sectionMeta: Record<Section, { title: string; sub: string }> = {
-  tcg:   { title: 'TCG',        sub: 'Collection Management' },
-  kora:  { title: 'Kora',       sub: 'Care platform admin' },
-  vl:    { title: 'Vision Lab', sub: 'ML training pipeline' },
-  vault: { title: 'Vault',      sub: 'Logins & passwords' },
+  status:   { title: 'Status',     sub: 'Service health' },
+  tcg:      { title: 'TCG',        sub: 'Collection Management' },
+  kora:     { title: 'Kora',       sub: 'Care platform admin' },
+  vl:       { title: 'Vision Lab', sub: 'ML training pipeline' },
+  vault:    { title: 'Vault',      sub: 'Logins & passwords' },
+  snippets: { title: 'Snippets',   sub: 'Commands & queries' },
+  release:  { title: 'Releases',   sub: 'Build & deploy' },
+  ssh:      { title: 'SSH',        sub: 'Remote terminals' },
 }
 
 function useActiveSection(): Section {
   const { pathname } = useLocation()
-  if (pathname.startsWith('/kora'))  return 'kora'
-  if (pathname.startsWith('/vl'))    return 'vl'
-  if (pathname.startsWith('/vault')) return 'vault'
+  if (pathname.startsWith('/status'))   return 'status'
+  if (pathname.startsWith('/kora'))     return 'kora'
+  if (pathname.startsWith('/vl'))       return 'vl'
+  if (pathname.startsWith('/vault'))    return 'vault'
+  if (pathname.startsWith('/snippets')) return 'snippets'
+  if (pathname.startsWith('/release'))  return 'release'
+  if (pathname.startsWith('/ssh'))      return 'ssh'
   return 'tcg'
 }
 
 export function Sidebar(): JSX.Element {
   const { user, logout } = useAuth()
   const { counts } = useAlerts()
+  const { can } = usePermissions()
   const navigate = useNavigate()
   const activeSection = useActiveSection()
   const { title, sub } = sectionMeta[activeSection]
 
+  const visibleSections = sections.filter(s => !s.permission || can(s.permission))
+
+  const [showPermSettings, setShowPermSettings] = useState(false)
+  const [tcgEmail, setTcgEmail]       = useState('')
+  const [tcgPassword, setTcgPassword] = useState('')
+  const [permSaving, setPermSaving]   = useState(false)
+  const [permError, setPermError]     = useState('')
+
+  function openPermSettings() {
+    const { email } = getTcgServiceAccount()
+    setTcgEmail(email)
+    setTcgPassword('')
+    setPermError('')
+    setShowPermSettings(true)
+  }
+
+  async function savePermSettings() {
+    const email = tcgEmail.trim()
+    if (!email) return
+    const { vaultId: existingVaultId } = getTcgServiceAccount()
+
+    setPermSaving(true)
+    setPermError('')
+    try {
+      let vaultId = existingVaultId
+
+      // Save password to vault if provided (or no vault entry exists yet)
+      if (tcgPassword || !existingVaultId) {
+        if (!tcgPassword) { setPermError('Password is required for first-time setup.'); return }
+        const result = await (window as any).vault.save({
+          id:       existingVaultId || undefined,
+          name:     'TCG Service Account',
+          username: email,
+          password: tcgPassword,
+          category: 'service',
+        })
+        if (!result?.ok) throw new Error(result?.error ?? 'Vault save failed')
+        vaultId = result.id
+      }
+
+      saveTcgServiceAccount(email, vaultId)
+      await authenticateTcg()
+      setShowPermSettings(false)
+    } catch (err) {
+      setPermError((err as Error).message)
+    } finally {
+      setPermSaving(false)
+    }
+  }
+
   const navGroups =
-    activeSection === 'tcg'   ? tcgNavGroups   :
-    activeSection === 'kora'  ? koraNavGroups  :
-    activeSection === 'vault' ? vaultNavGroups :
+    activeSection === 'status'   ? statusNavGroups   :
+    activeSection === 'tcg'      ? tcgNavGroups      :
+    activeSection === 'kora'     ? koraNavGroups     :
+    activeSection === 'vault'    ? vaultNavGroups    :
+    activeSection === 'snippets' ? snippetsNavGroups :
+    activeSection === 'release'  ? releaseNavGroups  :
+    activeSection === 'ssh'      ? sshNavGroups      :
     vlNavGroups
 
   const initials = (user?.username ?? user?.email ?? '?').slice(0, 2).toUpperCase()
@@ -213,12 +325,12 @@ export function Sidebar(): JSX.Element {
         className="flex w-[52px] shrink-0 flex-col items-center border-r border-border py-3"
         style={{ backgroundColor: 'hsl(var(--act-bar))' }}
       >
-        <span className="mb-5 select-none text-[11px] font-bold tracking-tight text-primary">
+        <span className="mb-5 select-none text-[11px] font-bold tracking-tight text-white">
           SBF
         </span>
 
         <div className="flex w-full flex-1 flex-col gap-0.5">
-          {sections.map(({ id, label, shortLabel, icon: Icon, root }) => (
+          {visibleSections.map(({ id, label, shortLabel, icon: Icon, root }) => (
             <button
               key={id}
               onClick={() => navigate(root)}
@@ -226,8 +338,8 @@ export function Sidebar(): JSX.Element {
               className={cn(
                 'flex w-full flex-col items-center gap-1 border-l-2 py-2.5 text-[8px] font-semibold uppercase tracking-[0.1em] transition-colors',
                 activeSection === id
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-transparent text-muted-foreground/40 hover:bg-accent/50 hover:text-muted-foreground'
+                  ? 'border-white bg-white/10 text-white'
+                  : 'border-transparent text-white/40 hover:bg-white/10 hover:text-white'
               )}
             >
               <Icon className="h-[18px] w-[18px]" />
@@ -237,17 +349,76 @@ export function Sidebar(): JSX.Element {
         </div>
 
         <div className="flex flex-col items-center gap-2.5">
+          <button
+            onClick={openPermSettings}
+            title="Permissions settings"
+            className="flex h-[26px] w-[26px] items-center justify-center rounded text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Settings className="h-[15px] w-[15px]" />
+          </button>
           {user && (
             <button
               onClick={logout}
               title="Sign out"
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-[9px] font-semibold text-primary transition-colors hover:bg-primary/20"
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-white/30 bg-white/10 text-[9px] font-semibold text-white transition-colors hover:bg-white/20"
             >
               {initials}
             </button>
           )}
         </div>
       </div>
+
+      {/* Permissions / Supabase config modal */}
+      {showPermSettings && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-sm font-semibold">Settings</h2>
+                <p className="text-[11px] text-muted-foreground">TCG backend service account</p>
+              </div>
+              <button onClick={() => setShowPermSettings(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 p-5">
+              <p className="text-[11px] text-muted-foreground">
+                Used to authenticate with the TCG backend after login. The password is encrypted and stored in your local vault.
+              </p>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Service account email</label>
+                <input
+                  value={tcgEmail}
+                  onChange={e => setTcgEmail(e.target.value)}
+                  placeholder="service@example.com"
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Password</label>
+                <input
+                  type="password"
+                  value={tcgPassword}
+                  onChange={e => setTcgPassword(e.target.value)}
+                  placeholder={getTcgServiceAccount().vaultId ? 'Leave blank to keep existing' : 'Enter password'}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+              {permError && (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {permError}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-4">
+              <button onClick={() => setShowPermSettings(false)} className="flex-1 rounded-md border border-border py-2 text-xs font-medium text-muted-foreground hover:text-foreground">Cancel</button>
+              <button onClick={savePermSettings} disabled={permSaving} className="flex-1 rounded-md bg-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+                {permSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Nav panel */}
       <nav className="flex w-[196px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
@@ -261,12 +432,15 @@ export function Sidebar(): JSX.Element {
         <div className="h-px shrink-0 bg-border" />
 
         <div className="flex-1 overflow-y-auto py-2">
-          {navGroups.map((group, gi) => (
+          {navGroups.map((group, gi) => {
+            const visibleItems = group.items.filter(item => !item.permission || can(item.permission))
+            if (visibleItems.length === 0) return null
+            return (
             <div key={group.label} className={cn(gi > 0 && 'mt-3')}>
               <p className="px-4 pb-0.5 pt-2.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/40">
                 {group.label}
               </p>
-              {group.items.map(({ to, label, icon: Icon, end, badge }) => {
+              {visibleItems.map(({ to, label, icon: Icon, end, badge }) => {
                 const count = badge ? counts[badge] : 0
                 return (
                   <NavLink
@@ -297,7 +471,8 @@ export function Sidebar(): JSX.Element {
                 )
               })}
             </div>
-          ))}
+            )
+          })}
         </div>
       </nav>
     </aside>

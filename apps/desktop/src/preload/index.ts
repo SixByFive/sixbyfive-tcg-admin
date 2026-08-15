@@ -79,11 +79,69 @@ const vaultAPI = {
   encryptionStatus: ()       => ipcRenderer.invoke('vault:encryptionStatus'),
 }
 
+const statusAPI = {
+  getTargets:   ()         => ipcRenderer.invoke('status:getTargets'),
+  checkAll:     ()         => ipcRenderer.invoke('status:checkAll'),
+  saveTarget:   (target)   => ipcRenderer.invoke('status:saveTarget', target),
+  deleteTarget: (id)       => ipcRenderer.invoke('status:deleteTarget', { id }),
+}
+
+const snippetsAPI = {
+  list:   ()        => ipcRenderer.invoke('snippets:list'),
+  save:   (snippet) => ipcRenderer.invoke('snippets:save', snippet),
+  delete: (id)      => ipcRenderer.invoke('snippets:delete', { id }),
+}
+
+const permissionsAPI = {
+  getConfig:  ()        => ipcRenderer.invoke('permissions:getConfig'),
+  saveConfig: (config)  => ipcRenderer.invoke('permissions:saveConfig', config),
+  forEmail:   (email)   => ipcRenderer.invoke('permissions:forEmail', { email }),
+  listRoles:  ()        => ipcRenderer.invoke('permissions:listRoles'),
+}
+
+const sshAPI = {
+  listConnections:  ()           => ipcRenderer.invoke('ssh:listConnections'),
+  saveConnection:   (conn)       => ipcRenderer.invoke('ssh:saveConnection', conn),
+  deleteConnection: (args)       => ipcRenderer.invoke('ssh:deleteConnection', args),
+  connect:          (args)       => ipcRenderer.invoke('ssh:connect', args),
+  disconnect:       (args)       => ipcRenderer.invoke('ssh:disconnect', args),
+  input:            (args)       => ipcRenderer.invoke('ssh:input', args),
+  resize:           (args)       => ipcRenderer.invoke('ssh:resize', args),
+  getConnectedTabs: ()           => ipcRenderer.invoke('ssh:getConnectedTabs'),
+  onData: (cb) => {
+    const h = (_, p) => cb(p)
+    ipcRenderer.on('ssh:data', h)
+    return () => ipcRenderer.removeListener('ssh:data', h)
+  },
+  onStatus: (cb) => {
+    const h = (_, p) => cb(p)
+    ipcRenderer.on('ssh:status', h)
+    return () => ipcRenderer.removeListener('ssh:status', h)
+  },
+}
+
+const releaseAPI = {
+  listProjects:    ()                    => ipcRenderer.invoke('release:listProjects'),
+  saveProject:     (p)                   => ipcRenderer.invoke('release:saveProject', p),
+  deleteProject:   (id)                  => ipcRenderer.invoke('release:deleteProject', { id }),
+  listReleases:    (projectId)           => ipcRenderer.invoke('release:listReleases', { projectId }),
+  saveRelease:     (r)                   => ipcRenderer.invoke('release:saveRelease', r),
+  deleteRelease:   (id)                  => ipcRenderer.invoke('release:deleteRelease', { id }),
+  listTags:        (projectId)           => ipcRenderer.invoke('release:listTags', { projectId }),
+  listRuns:        (projectId)           => ipcRenderer.invoke('release:listRuns', { projectId }),
+  triggerWorkflow: (projectId, ref)      => ipcRenderer.invoke('release:triggerWorkflow', { projectId, ref }),
+}
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('visionlab', visionlabAPI)
     contextBridge.exposeInMainWorld('vault', vaultAPI)
+    contextBridge.exposeInMainWorld('statusBoard', statusAPI)
+    contextBridge.exposeInMainWorld('snippets', snippetsAPI)
+    contextBridge.exposeInMainWorld('permissions', permissionsAPI)
+    contextBridge.exposeInMainWorld('ssh', sshAPI)
+    contextBridge.exposeInMainWorld('releaseManager', releaseAPI)
   } catch (error) {
     console.error(error)
   }
@@ -94,4 +152,14 @@ if (process.contextIsolated) {
   window.visionlab = visionlabAPI
   // @ts-ignore
   window.vault = vaultAPI
+  // @ts-ignore
+  window.statusBoard = statusAPI
+  // @ts-ignore
+  window.snippets = snippetsAPI
+  // @ts-ignore
+  window.permissions = permissionsAPI
+  // @ts-ignore
+  window.ssh = sshAPI
+  // @ts-ignore
+  window.releaseManager = releaseAPI
 }

@@ -1,6 +1,6 @@
 {
   "name": "@sixbyfive/desktop",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "SixByFive internal admin desktop app",
   "author": "SixByFive",
   "private": true,
@@ -19,7 +19,9 @@
       {
         "from": "../../vision-trainer/dist/vision-trainer",
         "to": "vision-trainer",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -43,21 +45,25 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
     "@sixbyfive/kora-client": "workspace:*",
+    "@supabase/supabase-js": "^2.112.3",
     "@tcg-admin/api-client": "workspace:*",
     "@tcg-admin/types": "workspace:*",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "chokidar": "^5.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "chokidar": "^5.0.0",
     "electron-updater": "^6.3.0",
-    "sharp": "^0.34.5",
-    "ssh2": "^1.17.0",
     "lucide-react": "^0.400.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.26.0",
-    "@tensorflow/tfjs": "^4.22.0",
+    "sharp": "^0.34.5",
+    "ssh2": "^1.17.0",
     "tailwind-merge": "^2.3.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "xterm": "^5.3.0"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",

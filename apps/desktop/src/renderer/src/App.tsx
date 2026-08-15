@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { KoraAuthProvider } from './context/KoraAuthContext'
 import { AlertsProvider } from './context/AlertsContext'
 import { AdminKeyProvider } from './context/AdminKeyContext'
+import { PermissionsProvider } from './context/PermissionsContext'
 import { LoginPage } from './pages/LoginPage'
 import { router } from './router'
 
@@ -45,13 +46,15 @@ export default function App(): JSX.Element {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <KoraAuthProvider>
-          <AdminKeyProvider>
-            <AlertsProvider>
-              <AppContent />
-            </AlertsProvider>
-          </AdminKeyProvider>
-        </KoraAuthProvider>
+        <PermissionsProvider>
+          <KoraAuthProvider>
+            <AdminKeyProvider>
+              <AlertsProvider>
+                <AppContent />
+              </AlertsProvider>
+            </AdminKeyProvider>
+          </KoraAuthProvider>
+        </PermissionsProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

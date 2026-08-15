@@ -10,6 +10,44 @@ import {
   vaultDelete,
   vaultEncryptionStatus,
 } from './vault/vault.handlers.js'
+import {
+  statusGetTargets,
+  statusCheckAll,
+  statusSaveTarget,
+  statusDeleteTarget,
+} from './status/status.handlers.js'
+import {
+  snippetsList,
+  snippetsSave,
+  snippetsDelete,
+} from './snippets/snippets.handlers.js'
+import {
+  permissionsGetConfig,
+  permissionsSaveConfig,
+  permissionsForEmail,
+  permissionsListRoles,
+} from './permissions/permissions.handlers.js'
+import {
+  sshListConnections,
+  sshSaveConnection,
+  sshDeleteConnection,
+  sshConnect,
+  sshDisconnect,
+  sshInput,
+  sshResize,
+  sshGetConnectedTabs,
+} from './ssh/ssh.handlers.js'
+import {
+  releaseListProjects,
+  releaseSaveProject,
+  releaseDeleteProject,
+  releaseListReleases,
+  releaseSaveRelease,
+  releaseDeleteRelease,
+  releaseListTags,
+  releaseListRuns,
+  releaseTriggerWorkflow,
+} from './release/release.handlers.js'
 import { ensureWorkspaceOnStartup, getWorkspacePath } from './vl/services/workspace.service.js'
 import { startWorkspaceWatcher } from './vl/services/workspaceWatcher.service.js'
 import { flushManifest } from './vl/services/manifest.service.js'
@@ -100,6 +138,39 @@ app.whenReady().then(() => {
   ipcMain.handle('vault:save',             vaultSave)
   ipcMain.handle('vault:delete',           vaultDelete)
   ipcMain.handle('vault:encryptionStatus', vaultEncryptionStatus)
+
+  ipcMain.handle('status:getTargets',   statusGetTargets)
+  ipcMain.handle('status:checkAll',     statusCheckAll)
+  ipcMain.handle('status:saveTarget',   statusSaveTarget)
+  ipcMain.handle('status:deleteTarget', statusDeleteTarget)
+
+  ipcMain.handle('permissions:getConfig',  permissionsGetConfig)
+  ipcMain.handle('permissions:saveConfig', permissionsSaveConfig)
+  ipcMain.handle('permissions:forEmail',   permissionsForEmail)
+  ipcMain.handle('permissions:listRoles',  permissionsListRoles)
+
+  ipcMain.handle('ssh:listConnections',  sshListConnections)
+  ipcMain.handle('ssh:saveConnection',   sshSaveConnection)
+  ipcMain.handle('ssh:deleteConnection', sshDeleteConnection)
+  ipcMain.handle('ssh:connect',          sshConnect)
+  ipcMain.handle('ssh:disconnect',       sshDisconnect)
+  ipcMain.handle('ssh:input',            sshInput)
+  ipcMain.handle('ssh:resize',           sshResize)
+  ipcMain.handle('ssh:getConnectedTabs', sshGetConnectedTabs)
+
+  ipcMain.handle('snippets:list',   snippetsList)
+  ipcMain.handle('snippets:save',   snippetsSave)
+  ipcMain.handle('snippets:delete', snippetsDelete)
+
+  ipcMain.handle('release:listProjects',    releaseListProjects)
+  ipcMain.handle('release:saveProject',     releaseSaveProject)
+  ipcMain.handle('release:deleteProject',   releaseDeleteProject)
+  ipcMain.handle('release:listReleases',    releaseListReleases)
+  ipcMain.handle('release:saveRelease',     releaseSaveRelease)
+  ipcMain.handle('release:deleteRelease',   releaseDeleteRelease)
+  ipcMain.handle('release:listTags',        releaseListTags)
+  ipcMain.handle('release:listRuns',        releaseListRuns)
+  ipcMain.handle('release:triggerWorkflow', releaseTriggerWorkflow)
 
   const mainWindow = createWindow()
 

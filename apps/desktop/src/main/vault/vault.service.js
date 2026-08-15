@@ -62,8 +62,10 @@ export function saveEntry({ id, name, url, username, password, notes, category }
     plain ? safeStorage.encryptString(plain).toString('base64') : null
 
   const existingIdx = id ? entries.findIndex(e => e.id === id) : -1
+  let resultId
 
   if (existingIdx >= 0) {
+    resultId = entries[existingIdx].id
     const prev = entries[existingIdx]
     entries[existingIdx] = {
       ...prev,
@@ -76,8 +78,9 @@ export function saveEntry({ id, name, url, username, password, notes, category }
       updatedAt: now,
     }
   } else {
+    resultId = crypto.randomUUID()
     entries.push({
-      id: crypto.randomUUID(),
+      id: resultId,
       name:              name     ?? '',
       url:               url      ?? '',
       username:          username ?? '',
@@ -90,7 +93,7 @@ export function saveEntry({ id, name, url, username, password, notes, category }
   }
 
   persist(entries)
-  return { ok: true }
+  return { ok: true, id: resultId }
 }
 
 export function deleteEntry(id) {
