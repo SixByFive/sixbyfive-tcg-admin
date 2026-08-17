@@ -44,12 +44,12 @@ async function loginTcgDirect(email: string, password: string): Promise<void> {
 // Looks up by stored vault ID first; if not set, scans vault for the
 // "TCG Service Account" entry so manual vault setup also works.
 export async function authenticateTcg(): Promise<void> {
+  const vaultAPI = (window as any).vault
   let vaultId = localStorage.getItem(TCG_VAULT_ID_KEY)
   let email   = localStorage.getItem(TCG_EMAIL_KEY)
 
-  if (!vaultId) {
+  const scanVault = async (): Promise<void> => {
     try {
-      const vaultAPI = (window as any).vault
       const entries: Array<{ id: string; name: string; username: string }> = await vaultAPI.list()
       const entry = entries?.find(e => e.name === 'TCG Service Account')
       if (entry) {
@@ -60,12 +60,31 @@ export async function authenticateTcg(): Promise<void> {
     } catch { /* vault not ready */ }
   }
 
+  if (!vaultId) await scanVault()
   if (!vaultId || !email) return
 
+  let password: string | undefined
   try {
-    const vaultAPI = (window as any).vault
-    const { password } = await vaultAPI.getPassword(vaultId)
-    if (!password) return
+    const result = await vaultAPI.getPassword(vaultId)
+    password = result?.password
+  } catch { /* stale id — will rescan */ }
+
+  if (!password) {
+    // Vault ID may be stale (entry recreated) — rescan by name
+    await scanVault()
+    if (!vaultId || !email) return
+    try {
+      const result = await vaultAPI.getPassword(vaultId)
+      password = result?.password
+    } catch (err) {
+      console.warn('[auth] TCG vault lookup failed:', err)
+      return
+    }
+  }
+
+  if (!password) return
+
+  try {
     await loginTcgDirect(email, password)
   } catch (err) {
     console.warn('[auth] TCG service account login failed:', err)
@@ -123,8 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   }, [])
 
   async function login(email: string, password: string): Promise<void> {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: { session }, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
+    if (session?.user) setUser(mapSupabaseUser(session.user))
 
     // Authenticate with TCG backend using the same credentials
     try {

@@ -477,11 +477,11 @@ export function createAdminApi(client: ApiClient) {
           adminPlans {
             id name description price interval platformFeePercent
             maxBinders maxActiveListings maxActiveTrades
-            isActive active sortOrder createdAt
+            active sortOrder createdAt
           }
         }`
       )
-      return data.adminPlans ?? []
+      return (data.adminPlans ?? []).filter(p => !p.interval?.toLowerCase().includes('year'))
     },
 
     async cancelAdminSubscription(id: string): Promise<void> {

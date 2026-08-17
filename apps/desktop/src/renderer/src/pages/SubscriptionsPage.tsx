@@ -12,7 +12,8 @@ export function SubscriptionsPage(): JSX.Element {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([])
+  const [plans, setPlans]       = useState<SubscriptionPlan[]>([])
+  const [plansError, setPlansError] = useState('')
 
   const [selected, setSelected] = useState<AdminSubscription | null>(null)
   const [actionState, setActionState] = useState<ActionState>('idle')
@@ -37,9 +38,12 @@ export function SubscriptionsPage(): JSX.Element {
   }, [page, statusFilter])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => {
-    adminApi.getPlans().then(setPlans).catch(() => {})
+  const loadPlans = useCallback(() => {
+    setPlansError('')
+    adminApi.getPlans().then(setPlans).catch(e => setPlansError(e.message))
   }, [])
+
+  useEffect(() => { loadPlans() }, [loadPlans])
 
   const doAction = async (fn: () => Promise<void>) => {
     setActionState('loading'); setActionError('')
@@ -141,21 +145,24 @@ export function SubscriptionsPage(): JSX.Element {
         {/* Grant subscription */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <p className="text-sm font-semibold text-foreground">Grant subscription to user</p>
-          <div className="flex gap-3 flex-wrap items-end">
-            <div className="flex-1 min-w-32">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+            <div>
               <label className="block text-xs text-muted-foreground mb-1">User ID</label>
               <input value={grantUserId} onChange={e => setGrantUserId(e.target.value)} placeholder="User UUID" className={`${inputCls} w-full`} />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Plan</label>
+              <label className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                Plan
+                <button onClick={loadPlans} className="text-muted-foreground/60 hover:text-foreground" title="Reload plans">↺</button>
+              </label>
               <select value={grantPlanId} onChange={e => setGrantPlanId(e.target.value)} className={inputCls}>
                 <option value="">Select…</option>
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-            <div className="w-36">
+            <div>
               <label className="block text-xs text-muted-foreground mb-1">Days (optional)</label>
-              <input value={grantDays} onChange={e => setGrantDays(e.target.value)} type="number" min="1" placeholder="30" className={inputCls} />
+              <input value={grantDays} onChange={e => setGrantDays(e.target.value)} type="number" min="1" placeholder="30" className={`${inputCls} w-28`} />
             </div>
             <button
               onClick={doGrant}
@@ -165,6 +172,12 @@ export function SubscriptionsPage(): JSX.Element {
               {grantState === 'loading' ? 'Granting…' : 'Grant'}
             </button>
           </div>
+          {plansError && (
+            <p className="text-xs text-destructive">
+              Failed to load plans: {plansError} —{' '}
+              <button onClick={loadPlans} className="underline">retry</button>
+            </p>
+          )}
           {grantState === 'ok' && <p className="text-xs text-green-400">Subscription granted successfully.</p>}
           {grantState === 'error' && <p className="text-xs text-destructive">{grantError}</p>}
         </div>

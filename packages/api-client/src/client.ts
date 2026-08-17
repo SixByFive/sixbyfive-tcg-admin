@@ -39,9 +39,11 @@ export class ApiClient {
   }
 
   async gql<T = unknown>(query: string, variables?: Record<string, unknown>, _isRetry = false): Promise<T> {
+    const extraHeaders: Record<string, string> = {}
+    if (this.adminApiKey) extraHeaders['x-admin-key'] = this.adminApiKey
     const res = await fetch(`${this.baseUrl}/graphql`, {
       method: 'POST',
-      headers: this.headers(),
+      headers: { ...this.headers(), ...extraHeaders },
       body: JSON.stringify({ query, variables }),
     })
 
