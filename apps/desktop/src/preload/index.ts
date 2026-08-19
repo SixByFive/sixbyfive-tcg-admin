@@ -135,6 +135,16 @@ const releaseAPI = {
 const marketingAPI = {
   listModels:       ()        => ipcRenderer.invoke('marketing:ollama:listModels'),
   generateCampaign: (payload) => ipcRenderer.invoke('marketing:ollama:generateCampaign', payload),
+  videoStatus:      ()        => ipcRenderer.invoke('marketing:video:status'),
+  setupVideoNode:   ()        => ipcRenderer.invoke('marketing:video:setup'),
+  startComfyUi:     ()        => ipcRenderer.invoke('marketing:video:startComfy'),
+  renderMotionVideo:(payload) => ipcRenderer.invoke('marketing:video:renderMotion', payload),
+  revealVideo:      (path)    => ipcRenderer.invoke('marketing:video:revealOutput', path),
+  onVideoStatus: (cb) => {
+    const h = (_, payload) => cb(payload)
+    ipcRenderer.on('marketing:video:status', h)
+    return () => ipcRenderer.removeListener('marketing:video:status', h)
+  },
 }
 
 if (process.contextIsolated) {
