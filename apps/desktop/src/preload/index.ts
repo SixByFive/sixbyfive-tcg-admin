@@ -142,6 +142,7 @@ const marketingAPI = {
   getBufferConnection: ()        => ipcRenderer.invoke('marketing:buffer:getConnection'),
   connectBuffer:       (apiKey)  => ipcRenderer.invoke('marketing:buffer:connect', { apiKey }),
   publishBuffer:       (payload) => ipcRenderer.invoke('marketing:buffer:publish', payload),
+  syncBufferMetrics:   ()        => ipcRenderer.invoke('marketing:buffer:syncMetrics'),
   videoStatus:         ()        => ipcRenderer.invoke('marketing:video:status'),
   setupVideoNode:      ()        => ipcRenderer.invoke('marketing:video:setup'),
   startComfyUi:        ()        => ipcRenderer.invoke('marketing:video:startComfy'),
