@@ -41,6 +41,8 @@ import {
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAuth, getTcgServiceAccount, saveTcgServiceAccount, authenticateTcg } from '@/context/AuthContext'
+import { getKoraServiceAccount, saveKoraServiceAccount } from '@/context/KoraAuthContext'
+import { useKoraAuth } from '@/context/KoraAuthContext'
 import { useAlerts, type AlertCounts } from '@/context/AlertsContext'
 import { usePermissions } from '@/context/PermissionsContext'
 
@@ -249,6 +251,7 @@ function useActiveSection(): Section {
 
 export function Sidebar(): JSX.Element {
   const { user, logout } = useAuth()
+  const { koraLogin } = useKoraAuth()
   const { counts } = useAlerts()
   const { can } = usePermissions()
   const navigate = useNavigate()
@@ -258,22 +261,26 @@ export function Sidebar(): JSX.Element {
   const visibleSections = sections.filter(s => !s.permission || can(s.permission))
 
   const [showPermSettings, setShowPermSettings] = useState(false)
-  const [tcgEmail, setTcgEmail]       = useState('')
-  const [tcgPassword, setTcgPassword] = useState('')
-  const [permSaving, setPermSaving]   = useState(false)
-  const [permError, setPermError]     = useState('')
+  const [tcgEmail, setTcgEmail]         = useState('')
+  const [tcgPassword, setTcgPassword]   = useState('')
+  const [koraEmail, setKoraEmail]       = useState('')
+  const [koraPassword, setKoraPassword] = useState('')
+  const [permSaving, setPermSaving]     = useState(false)
+  const [permError, setPermError]       = useState('')
 
   function openPermSettings() {
     const { email } = getTcgServiceAccount()
+    const { email: ke } = getKoraServiceAccount()
     setTcgEmail(email)
     setTcgPassword('')
+    setKoraEmail(ke)
+    setKoraPassword('')
     setPermError('')
     setShowPermSettings(true)
   }
 
   async function savePermSettings() {
     const email = tcgEmail.trim()
-    if (!email) return
     const { vaultId: existingVaultId } = getTcgServiceAccount()
 
     setPermSaving(true)
@@ -281,9 +288,9 @@ export function Sidebar(): JSX.Element {
     try {
       let vaultId = existingVaultId
 
-      // Save password to vault if provided (or no vault entry exists yet)
-      if (tcgPassword || !existingVaultId) {
-        if (!tcgPassword) { setPermError('Password is required for first-time setup.'); return }
+      // Save TCG credentials if email + password provided
+      if (email && (tcgPassword || !existingVaultId)) {
+        if (!tcgPassword) { setPermError('TCG password is required for first-time setup.'); return }
         const result = await (window as any).vault.save({
           id:       existingVaultId || undefined,
           name:     'TCG Service Account',
@@ -295,8 +302,27 @@ export function Sidebar(): JSX.Element {
         vaultId = result.id
       }
 
-      saveTcgServiceAccount(email, vaultId)
-      await authenticateTcg()
+      if (email) {
+        saveTcgServiceAccount(email, vaultId)
+        await authenticateTcg()
+      }
+
+      // Save Kora service account if provided
+      const koraEmailTrimmed = koraEmail.trim()
+      if (koraEmailTrimmed && koraPassword) {
+        const { vaultId: existingKoraVaultId } = getKoraServiceAccount()
+        const koraResult = await (window as any).vault.save({
+          id:       existingKoraVaultId || undefined,
+          name:     'Kora Service Account',
+          username: koraEmailTrimmed,
+          password: koraPassword,
+          category: 'service',
+        })
+        if (!koraResult?.ok) throw new Error(koraResult?.error ?? 'Vault save failed (Kora)')
+        saveKoraServiceAccount(koraEmailTrimmed, koraResult.id)
+        await koraLogin(koraEmailTrimmed, koraPassword)
+      }
+
       setShowPermSettings(false)
     } catch (err) {
       setPermError((err as Error).message)
@@ -375,34 +401,58 @@ export function Sidebar(): JSX.Element {
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-sm font-semibold">Settings</h2>
-                <p className="text-[11px] text-muted-foreground">TCG backend service account</p>
+                <p className="text-[11px] text-muted-foreground">Service account credentials</p>
               </div>
               <button onClick={() => setShowPermSettings(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex flex-col gap-3 p-5">
-              <p className="text-[11px] text-muted-foreground">
-                Used to authenticate with the TCG backend after login. The password is encrypted and stored in your local vault.
-              </p>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Service account email</label>
-                <input
-                  value={tcgEmail}
-                  onChange={e => setTcgEmail(e.target.value)}
-                  placeholder="service@example.com"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-                />
+            <div className="flex flex-col gap-4 p-5">
+              {/* TCG */}
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/60">TCG Backend</p>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <input
+                    value={tcgEmail}
+                    onChange={e => setTcgEmail(e.target.value)}
+                    placeholder="service@example.com"
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Password</label>
+                  <input
+                    type="password"
+                    value={tcgPassword}
+                    onChange={e => setTcgPassword(e.target.value)}
+                    placeholder={getTcgServiceAccount().vaultId ? 'Leave blank to keep existing' : 'Enter password'}
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Password</label>
-                <input
-                  type="password"
-                  value={tcgPassword}
-                  onChange={e => setTcgPassword(e.target.value)}
-                  placeholder={getTcgServiceAccount().vaultId ? 'Leave blank to keep existing' : 'Enter password'}
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-                />
+              {/* Kora */}
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/60">Kora</p>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <input
+                    value={koraEmail}
+                    onChange={e => setKoraEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Password</label>
+                  <input
+                    type="password"
+                    value={koraPassword}
+                    onChange={e => setKoraPassword(e.target.value)}
+                    placeholder={getKoraServiceAccount().vaultId ? 'Leave blank to keep existing' : 'Enter password'}
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
               </div>
               {permError && (
                 <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

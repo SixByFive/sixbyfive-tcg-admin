@@ -12,7 +12,21 @@ interface KoraAuthContextValue {
 }
 
 const KoraAuthContext = createContext<KoraAuthContextValue | null>(null)
-const REFRESH_KEY = 'kora_refresh'
+const REFRESH_KEY      = 'kora_refresh'
+const VAULT_ID_KEY     = 'kora_vault_id'
+const VAULT_EMAIL_KEY  = 'kora_email'
+
+export function saveKoraServiceAccount(email: string, vaultId: string): void {
+  localStorage.setItem(VAULT_EMAIL_KEY, email)
+  localStorage.setItem(VAULT_ID_KEY, vaultId)
+}
+
+export function getKoraServiceAccount(): { email: string; vaultId: string } {
+  return {
+    email:   localStorage.getItem(VAULT_EMAIL_KEY) ?? '',
+    vaultId: localStorage.getItem(VAULT_ID_KEY)    ?? '',
+  }
+}
 
 export function KoraAuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [koraUser, setKoraUser] = useState<KoraUser | null>(null)
@@ -43,26 +57,56 @@ export function KoraAuthProvider({ children }: { children: ReactNode }): JSX.Ele
     })
   }
 
+  async function authenticateFromVault(): Promise<boolean> {
+    const vaultAPI = (window as any).vault
+    let vaultId = localStorage.getItem(VAULT_ID_KEY)
+    let email   = localStorage.getItem(VAULT_EMAIL_KEY)
+
+    const scan = async (): Promise<void> => {
+      try {
+        const entries: Array<{ id: string; name: string; username: string }> = await vaultAPI.list()
+        const entry = entries?.find(e => e.name === 'Kora Service Account')
+        if (entry) { vaultId = entry.id; email = email || entry.username; saveKoraServiceAccount(email!, vaultId) }
+      } catch { /* vault not ready */ }
+    }
+
+    if (!vaultId) await scan()
+    if (!vaultId || !email) return false
+
+    let password: string | undefined
+    try { password = (await vaultAPI.getPassword(vaultId))?.password } catch { /* stale */ }
+    if (!password) { await scan(); if (!vaultId) return false; try { password = (await vaultAPI.getPassword(vaultId))?.password } catch { return false } }
+    if (!password) return false
+
+    try {
+      await koraLogin(email, password)
+      return true
+    } catch { return false }
+  }
+
   async function attemptRefresh(): Promise<void> {
     const refreshToken = localStorage.getItem(REFRESH_KEY)
-    if (!refreshToken) return
-    try {
-      const { accessToken, refreshToken: newRefresh } = await koraAuthApi.refresh(refreshToken)
-      koraClient.setAccessToken(accessToken)
-      localStorage.setItem(REFRESH_KEY, newRefresh)
-      installRefresh()
-      const me = await koraAuthApi.me()
-      if (!me.isPlatformAdmin) {
-        doLogout()
-        setKoraError('This account does not have Kora platform admin access.')
+    if (refreshToken) {
+      try {
+        const { accessToken, refreshToken: newRefresh } = await koraAuthApi.refresh(refreshToken)
+        koraClient.setAccessToken(accessToken)
+        localStorage.setItem(REFRESH_KEY, newRefresh)
+        installRefresh()
+        const me = await koraAuthApi.me()
+        if (!me.isPlatformAdmin) {
+          doLogout()
+          setKoraError('This account does not have Kora platform admin access.')
+          return
+        }
+        setKoraUser(me)
+        setKoraError(null)
         return
+      } catch {
+        localStorage.removeItem(REFRESH_KEY)
       }
-      setKoraUser(me)
-      setKoraError(null)
-    } catch (err) {
-      localStorage.removeItem(REFRESH_KEY)
-      setKoraError((err as Error).message || 'Failed to connect to Kora.')
     }
+    // No valid refresh token — try vault service account
+    await authenticateFromVault()
   }
 
   useEffect(() => {
