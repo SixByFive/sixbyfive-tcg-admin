@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import { deleteCampaign, getActiveCampaign, listCampaigns, saveCampaign, type StoredCampaign } from './campaign.store.js'
 
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434'
 
@@ -159,7 +160,27 @@ async function generateCampaign(args: GenerateCampaignArgs): Promise<{ ok: boole
   }
 }
 
+function saveStoredCampaign(_event: unknown, campaign: Omit<StoredCampaign, 'updatedAt'>) {
+  try {
+    return { ok: true, campaign: saveCampaign(campaign) }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+function deleteStoredCampaign(_event: unknown, id: string) {
+  try {
+    return { ok: deleteCampaign(id) }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 export function registerMarketingIpcHandlers(): void {
   ipcMain.handle('marketing:ollama:listModels', listModels)
   ipcMain.handle('marketing:ollama:generateCampaign', (_event, args: GenerateCampaignArgs) => generateCampaign(args))
+  ipcMain.handle('marketing:campaign:getActive', () => ({ ok: true, campaign: getActiveCampaign() }))
+  ipcMain.handle('marketing:campaign:list', () => ({ ok: true, campaigns: listCampaigns() }))
+  ipcMain.handle('marketing:campaign:save', saveStoredCampaign)
+  ipcMain.handle('marketing:campaign:delete', deleteStoredCampaign)
 }
