@@ -13,6 +13,16 @@ interface GeneratedPost {
   status: Status
 }
 
+interface StoredCampaign {
+  id: string
+  createdAt: string
+  updatedAt?: string
+  model: string
+  goal: Goal
+  brief: string
+  posts: GeneratedPost[]
+}
+
 interface OllamaModel {
   name: string
   model?: string
@@ -54,6 +64,8 @@ function formatModelSize(bytes?: number): string {
 
 export function MarketingPage(): JSX.Element {
   const navigate = useNavigate()
+  const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [campaignCreatedAt, setCampaignCreatedAt] = useState<string | null>(null)
   const [goal, setGoal] = useState<Goal>('registrations')
   const [brief, setBrief] = useState('')
   const [posts, setPosts] = useState<GeneratedPost[]>([])
@@ -64,6 +76,8 @@ export function MarketingPage(): JSX.Element {
   const [generationError, setGenerationError] = useState('')
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState<number | null>(null)
+  const [campaignLoading, setCampaignLoading] = useState(true)
+  const [saveError, setSaveError] = useState('')
 
   const approved = useMemo(() => posts.filter(post => post.status === 'approved').length, [posts])
 
@@ -95,9 +109,50 @@ export function MarketingPage(): JSX.Element {
     }
   }
 
+  async function loadActiveCampaign() {
+    setCampaignLoading(true)
+    try {
+      const result = await (window as any).marketing.getActiveCampaign()
+      const campaign = result?.campaign as StoredCampaign | null
+      if (!campaign) return
+
+      setCampaignId(campaign.id)
+      setCampaignCreatedAt(campaign.createdAt)
+      setGoal(campaign.goal)
+      setBrief(campaign.brief ?? '')
+      setPosts(Array.isArray(campaign.posts) ? campaign.posts : [])
+      setSelectedModel(current => campaign.model || current)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setCampaignLoading(false)
+    }
+  }
+
   useEffect(() => {
-    void loadModels()
+    void Promise.all([loadModels(), loadActiveCampaign()])
   }, [])
+
+  async function persistCampaign(nextPosts: GeneratedPost[], overrides?: Partial<Pick<StoredCampaign, 'id' | 'createdAt' | 'model' | 'goal' | 'brief'>>) {
+    const id = overrides?.id ?? campaignId
+    const createdAt = overrides?.createdAt ?? campaignCreatedAt
+    if (!id || !createdAt) return
+
+    setSaveError('')
+    const payload = {
+      id,
+      createdAt,
+      model: overrides?.model ?? selectedModel,
+      goal: overrides?.goal ?? goal,
+      brief: overrides?.brief ?? brief,
+      posts: nextPosts,
+    }
+
+    const result = await (window as any).marketing.saveCampaign(payload)
+    if (!result?.ok) {
+      setSaveError(result?.error ?? 'Could not save campaign.')
+    }
+  }
 
   async function handleGenerate() {
     if (!selectedModel || generating) return
@@ -118,12 +173,19 @@ export function MarketingPage(): JSX.Element {
 
       const campaign = goalCopy[goal].campaign
       const now = Date.now()
-      setPosts(result.posts.map((post, index) => ({
+      const nextPosts = result.posts.map((post, index) => ({
         id: now + index,
         platform: post.platform,
-        status: 'draft',
+        status: 'draft' as Status,
         content: `${post.content.trim()}\n\n${makeUtm(post.platform, campaign)}`,
-      })))
+      }))
+
+      const id = `campaign_${now}`
+      const createdAt = new Date(now).toISOString()
+      setCampaignId(id)
+      setCampaignCreatedAt(createdAt)
+      setPosts(nextPosts)
+      await persistCampaign(nextPosts, { id, createdAt, model: selectedModel, goal, brief })
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -131,11 +193,19 @@ export function MarketingPage(): JSX.Element {
     }
   }
 
-  function toggleApproval(id: number) {
-    setPosts(current => current.map(post => post.id === id
-      ? { ...post, status: post.status === 'approved' ? 'draft' : 'approved' }
+  async function toggleApproval(id: number) {
+    const next = posts.map(post => post.id === id
+      ? { ...post, status: post.status === 'approved' ? 'draft' as Status : 'approved' as Status }
       : post
-    ))
+    )
+    setPosts(next)
+    await persistCampaign(next)
+  }
+
+  async function updatePostContent(id: number, content: string) {
+    const next = posts.map(item => item.id === id ? { ...item, content } : item)
+    setPosts(next)
+    await persistCampaign(next)
   }
 
   async function copyPost(post: GeneratedPost) {
@@ -168,6 +238,13 @@ export function MarketingPage(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {saveError && (
+        <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
         <aside className="space-y-4">
@@ -255,7 +332,7 @@ export function MarketingPage(): JSX.Element {
               {generating ? 'Local model is writing…' : 'Generate with local AI'}
             </button>
             <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              The selected Ollama model generates the copy through the Ollama server running on this machine. This feature does not require a paid model API key.
+              Generated campaigns, edits, and approval state are saved locally in the desktop app and restored after restart.
             </p>
           </section>
         </aside>
@@ -274,7 +351,13 @@ export function MarketingPage(): JSX.Element {
             </div>
           )}
 
-          {posts.length === 0 && !generating && (
+          {campaignLoading && (
+            <div className="flex min-h-40 items-center justify-center rounded-xl border border-border bg-card/40 text-sm text-muted-foreground">
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading saved campaign…
+            </div>
+          )}
+
+          {!campaignLoading && posts.length === 0 && !generating && (
             <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
               <Sparkles className="mb-3 h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm font-medium">No campaign generated yet</p>
@@ -293,14 +376,14 @@ export function MarketingPage(): JSX.Element {
                   <button onClick={() => void copyPost(post)} className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
                     <Copy className="h-3.5 w-3.5" />{copied === post.id ? 'Copied' : 'Copy'}
                   </button>
-                  <button onClick={() => toggleApproval(post.id)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${post.status === 'approved' ? 'border border-border text-muted-foreground' : 'bg-primary text-primary-foreground'}`}>
+                  <button onClick={() => void toggleApproval(post.id)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${post.status === 'approved' ? 'border border-border text-muted-foreground' : 'bg-primary text-primary-foreground'}`}>
                     <Check className="h-3.5 w-3.5" />{post.status === 'approved' ? 'Unapprove' : 'Approve'}
                   </button>
                 </div>
               </div>
               <textarea
                 value={post.content}
-                onChange={event => setPosts(current => current.map(item => item.id === post.id ? { ...item, content: event.target.value } : item))}
+                onChange={event => void updatePostContent(post.id, event.target.value)}
                 rows={9}
                 className="w-full resize-y bg-transparent p-5 text-sm leading-relaxed text-foreground outline-none"
               />
