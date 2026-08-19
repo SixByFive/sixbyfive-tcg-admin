@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, BarChart3, Check, Copy, Cpu, Megaphone, RefreshCw, Sparkles, Target, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, BarChart3, Check, Copy, Cpu, Film, Megaphone, RefreshCw, Sparkles, Target, Users } from 'lucide-react'
 
 type Platform = 'Facebook' | 'Instagram' | 'LinkedIn' | 'Discord'
 type Goal = 'registrations' | 'collection' | 'trading' | 'marketplace'
@@ -52,6 +53,7 @@ function formatModelSize(bytes?: number): string {
 }
 
 export function MarketingPage(): JSX.Element {
+  const navigate = useNavigate()
   const [goal, setGoal] = useState<Goal>('registrations')
   const [brief, setBrief] = useState('')
   const [posts, setPosts] = useState<GeneratedPost[]>([])
@@ -153,6 +155,9 @@ export function MarketingPage(): JSX.Element {
           <p className="text-sm text-muted-foreground">Generate user-acquisition campaigns with AI running locally through Ollama.</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => navigate('/tcg/marketing/video')} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent/40">
+            <Film className="h-4 w-4 text-primary" /> TikTok Video
+          </button>
           <div className="rounded-lg border border-border bg-card px-4 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Approved</p>
             <p className="text-lg font-bold">{approved}/{posts.length}</p>
