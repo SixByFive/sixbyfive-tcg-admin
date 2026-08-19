@@ -4,6 +4,7 @@ import {
   listBufferPublications,
   recordPublication,
   updatePublicationMetrics,
+  type StoredCampaign,
   type StoredPostMetric,
 } from './campaign.store.js'
 
@@ -25,6 +26,12 @@ type PublishArgs = {
   service?: string
   text: string
   mode?: 'shareNow' | 'addToQueue'
+}
+
+const platformService: Partial<Record<StoredCampaign['posts'][number]['platform'], string>> = {
+  Facebook: 'facebook',
+  Instagram: 'instagram',
+  LinkedIn: 'linkedin',
 }
 
 function findBufferVaultEntry() {
@@ -135,7 +142,7 @@ async function connectBuffer(_event: unknown, { apiKey }: { apiKey?: string }) {
   }
 }
 
-async function publishBufferPost(_event: unknown, args: PublishArgs) {
+async function createBufferPost(args: PublishArgs) {
   const token = getBufferToken()
   if (!token) return { ok: false, error: 'Buffer is not connected.' }
   if (!args?.channelId || !args?.text?.trim()) return { ok: false, error: 'A channel and post text are required.' }
@@ -187,6 +194,67 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
+}
+
+async function publishBufferPost(_event: unknown, args: PublishArgs) {
+  return createBufferPost(args)
+}
+
+/**
+ * Approval is the normal publishing action: every newly-approved social post
+ * that has not already been sent to Buffer is added to that platform's queue.
+ * We intentionally require exactly one matching channel so approving a post can
+ * never fan out to multiple Facebook pages/Instagram accounts by accident.
+ * Discord is skipped because it is not a Buffer channel.
+ */
+export async function queueApprovedCampaignPosts(campaign: StoredCampaign) {
+  const token = getBufferToken()
+  if (!token) return { ok: false, queued: 0, errors: ['Buffer is not connected.'] }
+
+  let channels: BufferChannel[]
+  try {
+    channels = await fetchChannels(token)
+  } catch (error) {
+    return { ok: false, queued: 0, errors: [error instanceof Error ? error.message : String(error)] }
+  }
+
+  let queued = 0
+  const errors: string[] = []
+
+  for (const post of campaign.posts) {
+    if (post.status !== 'approved') continue
+    const service = platformService[post.platform]
+    if (!service) continue
+
+    // Never create a duplicate queue entry for a post already sent to Buffer.
+    if ((post.publications ?? []).some(publication => publication.provider === 'buffer')) continue
+
+    const matching = channels.filter(channel => channel.service === service)
+    if (matching.length === 0) {
+      errors.push(`${post.platform}: no matching Buffer channel is connected.`)
+      continue
+    }
+    if (matching.length > 1) {
+      errors.push(`${post.platform}: ${matching.length} Buffer channels are connected; choose one manually before approving.`)
+      continue
+    }
+
+    const channel = matching[0]
+    const result = await createBufferPost({
+      campaignId: campaign.id,
+      postId: post.id,
+      channelId: channel.id,
+      channelName: channel.name,
+      service: channel.service,
+      text: post.content,
+      mode: 'addToQueue',
+    })
+
+    if (result.ok) queued += 1
+    else errors.push(`${post.platform}: ${result.error ?? 'Buffer could not queue the post.'}`)
+  }
+
+  return { ok: errors.length === 0, queued, errors }
 }
 
 async function syncBufferMetrics() {
