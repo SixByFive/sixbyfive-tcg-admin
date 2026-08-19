@@ -250,7 +250,7 @@ export function MarketingPage(): JSX.Element {
               {generating ? 'Local model is writing…' : 'Generate with local AI'}
             </button>
             <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              The selected Ollama model generates the copy on this machine through the local Ollama API. No paid model API key is required by this feature.
+              The selected Ollama model generates the copy through the Ollama server running on this machine. This feature does not require a paid model API key.
             </p>
           </section>
         </aside>
