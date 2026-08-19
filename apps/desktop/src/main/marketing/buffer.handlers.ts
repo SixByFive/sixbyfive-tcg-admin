@@ -1,5 +1,11 @@
 import { ipcMain } from 'electron'
 import { getDecryptedPassword, listEntries, saveEntry } from '../vault/vault.service.js'
+import {
+  listBufferPublications,
+  recordPublication,
+  updatePublicationMetrics,
+  type StoredPostMetric,
+} from './campaign.store.js'
 
 const BUFFER_API_URL = 'https://api.buffer.com'
 const BUFFER_VAULT_NAME = 'SixByFive Marketing - Buffer API'
@@ -12,7 +18,11 @@ type BufferChannel = {
 }
 
 type PublishArgs = {
+  campaignId?: string
+  postId?: number
   channelId: string
+  channelName?: string
+  service?: string
   text: string
   mode?: 'shareNow' | 'addToQueue'
 }
@@ -52,10 +62,7 @@ async function fetchChannels(token: string): Promise<BufferChannel[]> {
   const accountData = await bufferGraphql(token, `
     query MarketingOrganizations {
       account {
-        organizations {
-          id
-          name
-        }
+        organizations { id name }
       }
     }
   `)
@@ -149,11 +156,11 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
               id
               text
               dueAt
+              channelId
+              externalLink
             }
           }
-          ... on MutationError {
-            message
-          }
+          ... on MutationError { message }
         }
       }
     `)
@@ -161,14 +168,82 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
     const result = data?.createPost
     if (result?.message) return { ok: false, error: result.message }
     if (!result?.post?.id) return { ok: false, error: 'Buffer did not return a created post.' }
+
+    if (args.campaignId && Number.isFinite(args.postId)) {
+      recordPublication(args.campaignId, Number(args.postId), {
+        provider: 'buffer',
+        providerPostId: String(result.post.id),
+        channelId: args.channelId,
+        channelName: args.channelName,
+        service: args.service,
+        mode,
+        createdAt: new Date().toISOString(),
+        dueAt: result.post.dueAt ?? null,
+        externalLink: result.post.externalLink ?? null,
+      })
+    }
+
     return { ok: true, post: result.post }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 
+async function syncBufferMetrics() {
+  const token = getBufferToken()
+  if (!token) return { ok: false, error: 'Buffer is not connected.', synced: 0 }
+
+  const publications = listBufferPublications()
+  let synced = 0
+  const errors: string[] = []
+
+  for (const publication of publications) {
+    try {
+      const data = await bufferGraphql(token, `
+        query MarketingPostMetrics {
+          post(input: { id: ${gqlString(publication.providerPostId)} }) {
+            id
+            externalLink
+            metrics {
+              type
+              name
+              value
+              unit
+            }
+            metricsUpdatedAt
+          }
+        }
+      `)
+      const post = data?.post
+      if (!post?.id) continue
+
+      const metrics: StoredPostMetric[] = Array.isArray(post.metrics)
+        ? post.metrics.map((metric: any) => ({
+            type: String(metric.type ?? ''),
+            name: String(metric.name ?? metric.type ?? ''),
+            value: Number(metric.value ?? 0),
+            unit: metric.unit == null ? null : String(metric.unit),
+          }))
+        : []
+
+      updatePublicationMetrics(publication.providerPostId, {
+        metrics,
+        metricsUpdatedAt: post.metricsUpdatedAt ?? null,
+        lastMetricsSyncAt: new Date().toISOString(),
+        externalLink: post.externalLink ?? publication.externalLink ?? null,
+      })
+      synced += 1
+    } catch (error) {
+      errors.push(`${publication.providerPostId}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  return { ok: errors.length === 0, synced, errors }
+}
+
 export function registerBufferIpcHandlers(): void {
   ipcMain.handle('marketing:buffer:getConnection', getBufferConnection)
   ipcMain.handle('marketing:buffer:connect', connectBuffer)
   ipcMain.handle('marketing:buffer:publish', publishBufferPost)
+  ipcMain.handle('marketing:buffer:syncMetrics', syncBufferMetrics)
 }
