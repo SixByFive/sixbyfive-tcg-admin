@@ -9,6 +9,7 @@ import { FinancialsPage } from '@/pages/FinancialsPage'
 import { ReportedUsersPage } from '@/pages/ReportedUsersPage'
 import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
+import { MarketingPage } from '@/pages/MarketingPage'
 import { BindersPage } from '@/pages/BindersPage'
 import { CollectionsPage } from '@/pages/CollectionsPage'
 import { ProductsPage } from '@/pages/ProductsPage'
@@ -61,6 +62,7 @@ export const router = createHashRouter([
           { path: 'reported-users', element: <ReportedUsersPage /> },
           { path: 'audit-logs',     element: <AuditLogsPage /> },
           { path: 'notifications',  element: <NotificationsPage /> },
+          { path: 'marketing',      element: <MarketingPage /> },
           { path: 'binders',        element: <BindersPage /> },
           { path: 'collections',    element: <CollectionsPage /> },
           { path: 'products',       element: <ProductsPage /> },
