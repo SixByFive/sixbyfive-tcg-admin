@@ -54,9 +54,16 @@ const goalCopy: Record<Goal, { label: string; campaign: string }> = {
   marketplace: { label: 'Marketplace', campaign: 'marketplace' },
 }
 
-function makeUtm(platform: Platform, campaign: string): string {
-  const source = platform.toLowerCase()
-  return `https://tcg.sixbyfive.com/?utm_source=${source}&utm_medium=social&utm_campaign=${campaign}`
+function makeUtm(platform: Platform, campaign: string, campaignId: string): string {
+  const params = new URLSearchParams({
+    utm_source: platform.toLowerCase(),
+    utm_medium: 'social',
+    utm_campaign: campaign,
+    // Unique identifier that lets signup/activation attribution map back to the
+    // exact generated campaign once the public site captures UTM parameters.
+    utm_content: campaignId,
+  })
+  return `https://tcg.sixbyfive.com/?${params.toString()}`
 }
 
 function formatModelSize(bytes?: number): string {
@@ -185,15 +192,15 @@ export function MarketingPage(): JSX.Element {
 
       const campaign = goalCopy[goal].campaign
       const now = Date.now()
+      const id = `campaign_${now}`
+      const createdAt = new Date(now).toISOString()
       const nextPosts = result.posts.map((post, index) => ({
         id: now + index,
         platform: post.platform,
         status: 'draft' as Status,
-        content: `${post.content.trim()}\n\n${makeUtm(post.platform, campaign)}`,
+        content: `${post.content.trim()}\n\n${makeUtm(post.platform, campaign, id)}`,
       }))
 
-      const id = `campaign_${now}`
-      const createdAt = new Date(now).toISOString()
       setCampaignId(id)
       setCampaignCreatedAt(createdAt)
       setPosts(nextPosts)
