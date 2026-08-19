@@ -133,17 +133,20 @@ const releaseAPI = {
 }
 
 const marketingAPI = {
-  listModels:       ()        => ipcRenderer.invoke('marketing:ollama:listModels'),
-  generateCampaign: (payload) => ipcRenderer.invoke('marketing:ollama:generateCampaign', payload),
-  getActiveCampaign:()        => ipcRenderer.invoke('marketing:campaign:getActive'),
-  listCampaigns:    ()        => ipcRenderer.invoke('marketing:campaign:list'),
-  saveCampaign:     (payload) => ipcRenderer.invoke('marketing:campaign:save', payload),
-  deleteCampaign:   (id)      => ipcRenderer.invoke('marketing:campaign:delete', id),
-  videoStatus:      ()        => ipcRenderer.invoke('marketing:video:status'),
-  setupVideoNode:   ()        => ipcRenderer.invoke('marketing:video:setup'),
-  startComfyUi:     ()        => ipcRenderer.invoke('marketing:video:startComfy'),
-  renderMotionVideo:(payload) => ipcRenderer.invoke('marketing:video:renderMotion', payload),
-  revealVideo:      (path)    => ipcRenderer.invoke('marketing:video:revealOutput', path),
+  listModels:          ()        => ipcRenderer.invoke('marketing:ollama:listModels'),
+  generateCampaign:    (payload) => ipcRenderer.invoke('marketing:ollama:generateCampaign', payload),
+  getActiveCampaign:   ()        => ipcRenderer.invoke('marketing:campaign:getActive'),
+  listCampaigns:       ()        => ipcRenderer.invoke('marketing:campaign:list'),
+  saveCampaign:        (payload) => ipcRenderer.invoke('marketing:campaign:save', payload),
+  deleteCampaign:      (id)      => ipcRenderer.invoke('marketing:campaign:delete', id),
+  getBufferConnection: ()        => ipcRenderer.invoke('marketing:buffer:getConnection'),
+  connectBuffer:       (apiKey)  => ipcRenderer.invoke('marketing:buffer:connect', { apiKey }),
+  publishBuffer:       (payload) => ipcRenderer.invoke('marketing:buffer:publish', payload),
+  videoStatus:         ()        => ipcRenderer.invoke('marketing:video:status'),
+  setupVideoNode:      ()        => ipcRenderer.invoke('marketing:video:setup'),
+  startComfyUi:        ()        => ipcRenderer.invoke('marketing:video:startComfy'),
+  renderMotionVideo:   (payload) => ipcRenderer.invoke('marketing:video:renderMotion', payload),
+  revealVideo:         (path)    => ipcRenderer.invoke('marketing:video:revealOutput', path),
   onVideoStatus: (cb) => {
     const h = (_, payload) => cb(payload)
     ipcRenderer.on('marketing:video:status', h)
