@@ -27,14 +27,18 @@ function getBufferToken(): string | null {
   return getDecryptedPassword(entry.id)
 }
 
-async function bufferGraphql(token: string, query: string, variables?: Record<string, unknown>) {
+function gqlString(value: string): string {
+  return JSON.stringify(value)
+}
+
+async function bufferGraphql(token: string, query: string) {
   const response = await fetch(BUFFER_API_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(20000),
   })
 
@@ -61,14 +65,14 @@ async function fetchChannels(token: string): Promise<BufferChannel[]> {
 
   for (const organization of organizations) {
     const data = await bufferGraphql(token, `
-      query MarketingChannels($organizationId: ID!) {
-        channels(input: { organizationId: $organizationId }) {
+      query MarketingChannels {
+        channels(input: { organizationId: ${gqlString(String(organization.id))} }) {
           id
           name
           service
         }
       }
-    `, { organizationId: organization.id })
+    `)
 
     for (const channel of data?.channels ?? []) {
       channels.push({
@@ -133,8 +137,13 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
 
   try {
     const data = await bufferGraphql(token, `
-      mutation PublishMarketingPost($input: CreatePostInput!) {
-        createPost(input: $input) {
+      mutation PublishMarketingPost {
+        createPost(input: {
+          text: ${gqlString(args.text.trim())}
+          channelId: ${gqlString(args.channelId)}
+          schedulingType: automatic
+          mode: ${mode}
+        }) {
           ... on PostActionSuccess {
             post {
               id
@@ -147,14 +156,7 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
           }
         }
       }
-    `, {
-      input: {
-        text: args.text.trim(),
-        channelId: args.channelId,
-        schedulingType: 'automatic',
-        mode,
-      },
-    })
+    `)
 
     const result = data?.createPost
     if (result?.message) return { ok: false, error: result.message }
