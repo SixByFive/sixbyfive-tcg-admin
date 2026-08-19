@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, BarChart3, CheckCircle2, RefreshCw, Send, Unplug } from 'lucide-react'
+import { AlertCircle, BarChart3, CheckCircle2, History, RefreshCw, Send, Unplug } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { MarketingPage } from './MarketingPage'
 
 type BufferChannel = { id: string; name: string; service: string; organizationId: string }
@@ -40,6 +41,7 @@ function metricValue(metrics: Metric[] | undefined, type: string): number {
 }
 
 export function MarketingHubPage(): JSX.Element {
+  const navigate = useNavigate()
   const [channels, setChannels] = useState<BufferChannel[]>([])
   const [connected, setConnected] = useState(false)
   const [campaign, setCampaign] = useState<StoredCampaign | null>(null)
@@ -132,7 +134,10 @@ export function MarketingHubPage(): JSX.Element {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Buffer handles Facebook, Instagram and LinkedIn publishing and performance metrics.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => navigate('/tcg/marketing/history')} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+              <History className="h-3.5 w-3.5" /> Campaign history
+            </button>
             {connected && publicationCount > 0 && (
               <button onClick={() => void syncMetrics()} disabled={metricsLoading} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
                 <BarChart3 className="h-3.5 w-3.5" /> {metricsLoading ? 'Syncing…' : 'Sync metrics'}
