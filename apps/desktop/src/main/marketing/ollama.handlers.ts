@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { deleteCampaign, getActiveCampaign, listCampaigns, saveCampaign, type StoredCampaign } from './campaign.store.js'
-import { registerBufferIpcHandlers } from './buffer.handlers.js'
+import { queueApprovedCampaignPosts, registerBufferIpcHandlers } from './buffer.handlers.js'
 
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434'
 
@@ -262,9 +262,24 @@ async function generateCampaign(args: GenerateCampaignArgs): Promise<{ ok: boole
   }
 }
 
-function saveStoredCampaign(_event: unknown, campaign: Omit<StoredCampaign, 'updatedAt'>) {
+async function saveStoredCampaign(_event: unknown, campaign: Omit<StoredCampaign, 'updatedAt'>) {
   try {
-    return { ok: true, campaign: saveCampaign(campaign) }
+    const saved = saveCampaign(campaign)
+
+    // Approval is also the queue action. The Buffer helper ignores drafts,
+    // Discord, and posts that already have a Buffer publication, so ordinary
+    // edits/saves cannot create duplicate queue entries.
+    const queueResult = await queueApprovedCampaignPosts(saved)
+    if (!queueResult.ok) {
+      return {
+        ok: false,
+        campaign: saved,
+        queued: queueResult.queued,
+        error: queueResult.errors.join('; '),
+      }
+    }
+
+    return { ok: true, campaign: saved, queued: queueResult.queued }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
