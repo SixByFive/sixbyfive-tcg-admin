@@ -250,7 +250,7 @@ export function MarketingPage(): JSX.Element {
               {generating ? 'Local model is writing…' : 'Generate with local AI'}
             </button>
             <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              Generation stays on this machine. No paid AI API key is used; Ollama runs the selected model using your local CPU/GPU/RAM.
+              The selected Ollama model generates the copy on this machine. SixByFive Admin does not send the campaign brief to a paid AI provider.
             </p>
           </section>
         </aside>
