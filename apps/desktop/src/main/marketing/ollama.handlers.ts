@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { deleteCampaign, getActiveCampaign, listCampaigns, saveCampaign, type StoredCampaign } from './campaign.store.js'
+import { registerBufferIpcHandlers } from './buffer.handlers.js'
 
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434'
 
@@ -183,4 +184,5 @@ export function registerMarketingIpcHandlers(): void {
   ipcMain.handle('marketing:campaign:list', () => ({ ok: true, campaigns: listCampaigns() }))
   ipcMain.handle('marketing:campaign:save', saveStoredCampaign)
   ipcMain.handle('marketing:campaign:delete', deleteStoredCampaign)
+  registerBufferIpcHandlers()
 }
