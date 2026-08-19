@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers as registerVlIpcHandlers } from './vl/registerIpcHandlers.js'
 import { registerMarketingIpcHandlers } from './marketing/ollama.handlers.js'
+import { registerMarketingVideoIpcHandlers } from './marketing/video.handlers.js'
 import {
   vaultList,
   vaultGetPassword,
@@ -134,6 +135,7 @@ app.whenReady().then(() => {
 
   registerVlIpcHandlers()
   registerMarketingIpcHandlers()
+  registerMarketingVideoIpcHandlers()
 
   ipcMain.handle('vault:list',             vaultList)
   ipcMain.handle('vault:getPassword',      vaultGetPassword)
