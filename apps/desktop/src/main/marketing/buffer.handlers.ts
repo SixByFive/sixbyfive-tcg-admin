@@ -26,6 +26,10 @@ type PublishArgs = {
   service?: string
   text: string
   mode?: 'shareNow' | 'addToQueue'
+  // Instagram requires media. This is intentionally optional for the other
+  // platforms so ordinary Facebook / LinkedIn text posts stay simple.
+  mediaUrl?: string
+  mediaType?: 'image' | 'video'
 }
 
 const platformService: Partial<Record<StoredCampaign['posts'][number]['platform'], string>> = {
@@ -46,6 +50,32 @@ function getBufferToken(): string | null {
 
 function gqlString(value: string): string {
   return JSON.stringify(value)
+}
+
+/**
+ * Buffer validates channel-specific post metadata.
+ * Facebook and Instagram both require an explicit post type.
+ */
+function serviceMetadata(service?: string): string {
+  switch (String(service ?? '').toLowerCase()) {
+    case 'facebook':
+      return 'metadata: { facebook: { type: post } }'
+    case 'instagram':
+      return 'metadata: { instagram: { type: post, shouldShareToFeed: true } }'
+    default:
+      return ''
+  }
+}
+
+function serviceAssets(args: PublishArgs): string {
+  const service = String(args.service ?? '').toLowerCase()
+  if (service !== 'instagram' || !args.mediaUrl?.trim()) return ''
+
+  const url = gqlString(args.mediaUrl.trim())
+  if (args.mediaType === 'video') {
+    return `assets: [{ video: { url: ${url} } }]`
+  }
+  return `assets: [{ image: { url: ${url} } }]`
 }
 
 async function bufferGraphql(token: string, query: string) {
@@ -147,7 +177,21 @@ async function createBufferPost(args: PublishArgs) {
   if (!token) return { ok: false, error: 'Buffer is not connected.' }
   if (!args?.channelId || !args?.text?.trim()) return { ok: false, error: 'A channel and post text are required.' }
 
+  const service = String(args.service ?? '').toLowerCase()
+
+  // Buffer/Instagram cannot create text-only posts. Do this check locally so an
+  // approved Instagram draft does not fail with a vague remote validation error.
+  if (service === 'instagram' && !args.mediaUrl?.trim()) {
+    return {
+      ok: false,
+      error: 'Instagram requires an image or video before it can be queued.',
+      requiresMedia: true,
+    }
+  }
+
   const mode = args.mode === 'addToQueue' ? 'addToQueue' : 'shareNow'
+  const metadata = serviceMetadata(service)
+  const assets = serviceAssets(args)
 
   try {
     const data = await bufferGraphql(token, `
@@ -157,6 +201,8 @@ async function createBufferPost(args: PublishArgs) {
           channelId: ${gqlString(args.channelId)}
           schedulingType: automatic
           mode: ${mode}
+          ${assets}
+          ${metadata}
         }) {
           ... on PostActionSuccess {
             post {
@@ -206,6 +252,10 @@ async function publishBufferPost(_event: unknown, args: PublishArgs) {
  * We intentionally require exactly one matching channel so approving a post can
  * never fan out to multiple Facebook pages/Instagram accounts by accident.
  * Discord is skipped because it is not a Buffer channel.
+ *
+ * Instagram is also skipped for now when there is no media asset. Its approval
+ * still persists; once the marketing image/video pipeline attaches a public
+ * media URL, the post can be queued without asking the user to re-approve it.
  */
 export async function queueApprovedCampaignPosts(campaign: StoredCampaign) {
   const token = getBufferToken()
@@ -228,6 +278,11 @@ export async function queueApprovedCampaignPosts(campaign: StoredCampaign) {
 
     // Never create a duplicate queue entry for a post already sent to Buffer.
     if ((post.publications ?? []).some(publication => publication.provider === 'buffer')) continue
+
+    // Instagram requires an image/video. Until a media asset is attached by the
+    // campaign-media pipeline, keep the draft approved without turning the whole
+    // campaign save into an error.
+    if (service === 'instagram') continue
 
     const matching = channels.filter(channel => channel.service === service)
     if (matching.length === 0) {
