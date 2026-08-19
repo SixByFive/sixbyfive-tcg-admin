@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BarChart3, Copy, History, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { loadMarketingAttribution, type MarketingAttributionSummary } from '@/lib/marketingInsights'
 
 type Metric = { type: string; name: string; value: number; unit?: string | null }
 type Publication = {
@@ -28,11 +29,6 @@ type Campaign = {
   goal: string
   brief: string
   posts: CampaignPost[]
-  liveDataSnapshot?: {
-    attribution?: {
-      campaigns?: Array<{ campaignId?: string | null; registrations?: number }>
-    }
-  }
 }
 
 function metricValue(metrics: Metric[] | undefined, type: string): number {
@@ -42,13 +38,14 @@ function metricValue(metrics: Metric[] | undefined, type: string): number {
   )?.value ?? 0)
 }
 
-function registrationsFor(campaign: Campaign): number {
-  return Number(campaign.liveDataSnapshot?.attribution?.campaigns?.find(item => item.campaignId === campaign.id)?.registrations ?? 0)
-}
-
 export function MarketingHistoryPage(): JSX.Element {
   const navigate = useNavigate()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [attribution, setAttribution] = useState<MarketingAttributionSummary>({
+    totalAttributedRegistrations: 0,
+    totalActivatedUsers: 0,
+    campaigns: [],
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState<number | null>(null)
@@ -57,9 +54,13 @@ export function MarketingHistoryPage(): JSX.Element {
     setLoading(true)
     setError('')
     try {
-      const result = await (window as any).marketing.listCampaigns()
+      const [result, attributionResult] = await Promise.all([
+        (window as any).marketing.listCampaigns(),
+        loadMarketingAttribution(),
+      ])
       if (!result?.ok) throw new Error(result?.error ?? 'Could not load campaigns.')
       setCampaigns(Array.isArray(result.campaigns) ? result.campaigns : [])
+      setAttribution(attributionResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -69,12 +70,22 @@ export function MarketingHistoryPage(): JSX.Element {
 
   useEffect(() => { void loadCampaigns() }, [])
 
+  function conversionFor(campaignId: string) {
+    return attribution.campaigns.find(item => item.campaignId === campaignId) ?? {
+      registrations: 0,
+      activatedUsers: 0,
+      activationRate: 0,
+    }
+  }
+
   const totals = useMemo(() => campaigns.reduce((summary, campaign) => {
+    const conversion = attribution.campaigns.find(item => item.campaignId === campaign.id)
     summary.campaigns += 1
     summary.publications += campaign.posts.reduce((sum, post) => sum + (post.publications?.length ?? 0), 0)
-    summary.registrations += registrationsFor(campaign)
+    summary.registrations += Number(conversion?.registrations ?? 0)
+    summary.activatedUsers += Number(conversion?.activatedUsers ?? 0)
     return summary
-  }, { campaigns: 0, publications: 0, registrations: 0 }), [campaigns])
+  }, { campaigns: 0, publications: 0, registrations: 0, activatedUsers: 0 }), [campaigns, attribution])
 
   async function copyPost(post: CampaignPost) {
     await navigator.clipboard.writeText(post.content)
@@ -90,7 +101,7 @@ export function MarketingHistoryPage(): JSX.Element {
             <History className="h-5 w-5 text-primary" />
             <h1 className="text-2xl font-bold">Campaign history</h1>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">Review generated campaigns, publication history and the evidence used by future local-AI generations.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Review generated campaigns, live acquisition results, publication history and the evidence used by future local-AI generations.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => navigate('/tcg/marketing')} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
@@ -102,10 +113,11 @@ export function MarketingHistoryPage(): JSX.Element {
         </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Campaigns</p><p className="mt-1 text-xl font-bold">{totals.campaigns}</p></div>
-        <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Buffer publications</p><p className="mt-1 text-xl font-bold">{totals.publications}</p></div>
-        <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Attributed registrations</p><p className="mt-1 text-xl font-bold">{totals.registrations}</p></div>
+        <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Publications</p><p className="mt-1 text-xl font-bold">{totals.publications}</p></div>
+        <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Registrations</p><p className="mt-1 text-xl font-bold">{totals.registrations}</p></div>
+        <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Activated users</p><p className="mt-1 text-xl font-bold">{totals.activatedUsers}</p></div>
       </div>
 
       {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
@@ -117,7 +129,7 @@ export function MarketingHistoryPage(): JSX.Element {
       ) : (
         <div className="space-y-4">
           {campaigns.map(campaign => {
-            const registrations = registrationsFor(campaign)
+            const conversion = conversionFor(campaign.id)
             const publications = campaign.posts.flatMap(post => post.publications ?? [])
             const clicks = publications.reduce((sum, publication) => sum + metricValue(publication.metrics, 'clicks'), 0)
             const impressions = publications.reduce((sum, publication) => sum + metricValue(publication.metrics, 'impressions'), 0)
@@ -134,8 +146,10 @@ export function MarketingHistoryPage(): JSX.Element {
                   {campaign.brief && <p className="mt-2 max-w-3xl text-sm">{campaign.brief}</p>}
                 </div>
 
-                <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-3">
-                  <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Registrations</p><p className="mt-1 text-lg font-semibold">{registrations}</p></div>
+                <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-5">
+                  <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Registrations</p><p className="mt-1 text-lg font-semibold">{conversion.registrations}</p></div>
+                  <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Activated</p><p className="mt-1 text-lg font-semibold">{conversion.activatedUsers}</p></div>
+                  <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Activation</p><p className="mt-1 text-lg font-semibold">{Number(conversion.activationRate ?? 0).toFixed(1)}%</p></div>
                   <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Clicks</p><p className="mt-1 text-lg font-semibold">{clicks.toLocaleString()}</p></div>
                   <div className="rounded-lg bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Impressions</p><p className="mt-1 text-lg font-semibold">{impressions.toLocaleString()}</p></div>
                 </div>
