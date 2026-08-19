@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, BarChart3, Check, Copy, Cpu, Film, Megaphone, RefreshCw, Sparkles, Target, Users } from 'lucide-react'
+import { AlertCircle, BarChart3, Check, Copy, Cpu, Database, Film, Megaphone, RefreshCw, Sparkles, Target, Users } from 'lucide-react'
+import { loadMarketingLiveDataSnapshot, type MarketingLiveDataSnapshot } from '@/lib/marketingInsights'
 
 type Platform = 'Facebook' | 'Instagram' | 'LinkedIn' | 'Discord'
 type Goal = 'registrations' | 'collection' | 'trading' | 'marketplace'
@@ -21,6 +22,7 @@ interface StoredCampaign {
   goal: Goal
   brief: string
   posts: GeneratedPost[]
+  liveDataSnapshot?: MarketingLiveDataSnapshot
 }
 
 interface OllamaModel {
@@ -78,6 +80,7 @@ export function MarketingPage(): JSX.Element {
   const [copied, setCopied] = useState<number | null>(null)
   const [campaignLoading, setCampaignLoading] = useState(true)
   const [saveError, setSaveError] = useState('')
+  const [liveDataSnapshot, setLiveDataSnapshot] = useState<MarketingLiveDataSnapshot | null>(null)
 
   const approved = useMemo(() => posts.filter(post => post.status === 'approved').length, [posts])
 
@@ -121,6 +124,7 @@ export function MarketingPage(): JSX.Element {
       setGoal(campaign.goal)
       setBrief(campaign.brief ?? '')
       setPosts(Array.isArray(campaign.posts) ? campaign.posts : [])
+      setLiveDataSnapshot(campaign.liveDataSnapshot ?? null)
       setSelectedModel(current => campaign.model || current)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : String(error))
@@ -133,7 +137,10 @@ export function MarketingPage(): JSX.Element {
     void Promise.all([loadModels(), loadActiveCampaign()])
   }, [])
 
-  async function persistCampaign(nextPosts: GeneratedPost[], overrides?: Partial<Pick<StoredCampaign, 'id' | 'createdAt' | 'model' | 'goal' | 'brief'>>) {
+  async function persistCampaign(
+    nextPosts: GeneratedPost[],
+    overrides?: Partial<Pick<StoredCampaign, 'id' | 'createdAt' | 'model' | 'goal' | 'brief' | 'liveDataSnapshot'>>,
+  ) {
     const id = overrides?.id ?? campaignId
     const createdAt = overrides?.createdAt ?? campaignCreatedAt
     if (!id || !createdAt) return
@@ -146,6 +153,7 @@ export function MarketingPage(): JSX.Element {
       goal: overrides?.goal ?? goal,
       brief: overrides?.brief ?? brief,
       posts: nextPosts,
+      liveDataSnapshot: overrides?.liveDataSnapshot ?? liveDataSnapshot ?? undefined,
     }
 
     const result = await (window as any).marketing.saveCampaign(payload)
@@ -160,10 +168,14 @@ export function MarketingPage(): JSX.Element {
     setGenerationError('')
 
     try {
+      const snapshot = await loadMarketingLiveDataSnapshot()
+      setLiveDataSnapshot(snapshot)
+
       const result = await (window as any).marketing.generateCampaign({
         model: selectedModel,
         goal,
         brief: brief.trim() || undefined,
+        liveData: snapshot,
       }) as GenerateResult
 
       if (!result.ok || !result.posts) {
@@ -185,7 +197,14 @@ export function MarketingPage(): JSX.Element {
       setCampaignId(id)
       setCampaignCreatedAt(createdAt)
       setPosts(nextPosts)
-      await persistCampaign(nextPosts, { id, createdAt, model: selectedModel, goal, brief })
+      await persistCampaign(nextPosts, {
+        id,
+        createdAt,
+        model: selectedModel,
+        goal,
+        brief,
+        liveDataSnapshot: snapshot,
+      })
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -222,7 +241,7 @@ export function MarketingPage(): JSX.Element {
             <Megaphone className="h-5 w-5 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Marketing</h1>
           </div>
-          <p className="text-sm text-muted-foreground">Generate user-acquisition campaigns with AI running locally through Ollama.</p>
+          <p className="text-sm text-muted-foreground">Generate user-acquisition campaigns with local AI, live SixByFive data, and historical performance context.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => navigate('/tcg/marketing/video')} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent/40">
@@ -329,18 +348,34 @@ export function MarketingPage(): JSX.Element {
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
             >
               {generating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {generating ? 'Local model is writing…' : 'Generate with local AI'}
+              {generating ? 'Reading data + writing…' : 'Generate with local AI'}
             </button>
             <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              Generated campaigns, edits, and approval state are saved locally in the desktop app and restored after restart.
+              Generation captures fresh admin data and uses previous Buffer performance as prompt context. Campaigns, edits and approval state remain local.
             </p>
           </section>
+
+          {liveDataSnapshot && (
+            <section className="rounded-xl border border-border bg-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Data used</h2>
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p><span className="text-foreground">{liveDataSnapshot.totalUsers.toLocaleString()}</span> total users</p>
+                <p><span className="text-foreground">{liveDataSnapshot.collectionProfilesSampled}</span> collection profiles sampled</p>
+                <p><span className="text-foreground">{liveDataSnapshot.collectionCardsInSample.toLocaleString()}</span> cards in collection sample</p>
+                <p><span className="text-foreground">{liveDataSnapshot.recentMarketplaceListings.length}</span> recent marketplace listings sampled</p>
+              </div>
+              <p className="mt-3 text-[10px] text-muted-foreground">Captured {new Date(liveDataSnapshot.capturedAt).toLocaleString()}.</p>
+            </section>
+          )}
         </aside>
 
         <main className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-border bg-card p-4"><Users className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">Objective</p><p className="mt-1 text-sm font-semibold">Acquire users</p></div>
-            <div className="rounded-xl border border-border bg-card p-4"><BarChart3 className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">Tracking</p><p className="mt-1 text-sm font-semibold">UTM per platform</p></div>
+            <div className="rounded-xl border border-border bg-card p-4"><BarChart3 className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">Learning</p><p className="mt-1 text-sm font-semibold">Buffer performance</p></div>
             <div className="rounded-xl border border-border bg-card p-4"><Target className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">Current angle</p><p className="mt-1 text-sm font-semibold">{goalCopy[goal].label}</p></div>
           </div>
 
@@ -361,7 +396,7 @@ export function MarketingPage(): JSX.Element {
             <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
               <Sparkles className="mb-3 h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm font-medium">No campaign generated yet</p>
-              <p className="mt-1 max-w-md text-xs text-muted-foreground">Choose a local model and campaign goal, add any useful context, then generate. The model will create a separate acquisition post for each platform.</p>
+              <p className="mt-1 max-w-md text-xs text-muted-foreground">Choose a local model and campaign goal. Generation will pull fresh SixByFive data and use any existing campaign-performance history.</p>
             </div>
           )}
 
