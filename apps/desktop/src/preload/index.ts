@@ -132,6 +132,11 @@ const releaseAPI = {
   triggerWorkflow: (projectId, ref)      => ipcRenderer.invoke('release:triggerWorkflow', { projectId, ref }),
 }
 
+const marketingAPI = {
+  listModels:       ()        => ipcRenderer.invoke('marketing:ollama:listModels'),
+  generateCampaign: (payload) => ipcRenderer.invoke('marketing:ollama:generateCampaign', payload),
+}
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -142,6 +147,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('permissions', permissionsAPI)
     contextBridge.exposeInMainWorld('ssh', sshAPI)
     contextBridge.exposeInMainWorld('releaseManager', releaseAPI)
+    contextBridge.exposeInMainWorld('marketing', marketingAPI)
   } catch (error) {
     console.error(error)
   }
@@ -162,4 +168,6 @@ if (process.contextIsolated) {
   window.ssh = sshAPI
   // @ts-ignore
   window.releaseManager = releaseAPI
+  // @ts-ignore
+  window.marketing = marketingAPI
 }
