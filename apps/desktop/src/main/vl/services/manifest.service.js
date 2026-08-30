@@ -85,11 +85,16 @@ export function healManifest(maybe) {
     if (!("processedFile" in img)) { img.processedFile = null; changed = true; }
 
     if (!("card" in img) || !img.card || typeof img.card !== "object") {
-      img.card = { setCode: "", number: "", name: "" }; changed = true;
+      img.card = { setCode: "", number: "", name: "", total: "" }; changed = true;
     } else {
       if (!("setCode" in img.card)) { img.card.setCode = ""; changed = true; }
       if (!("number" in img.card)) { img.card.number = ""; changed = true; }
       if (!("name" in img.card)) { img.card.name = ""; changed = true; }
+      if (!("total" in img.card)) { img.card.total = ""; changed = true; }
+    }
+
+    if (!("bbox" in img)) {
+      img.bbox = null; changed = true;
     }
 
     if (!("finish" in img)) {
@@ -282,6 +287,13 @@ export function isLabeled(img) {
   );
 }
 
+export function isBboxLabeled(img) {
+  const b = img?.bbox;
+  return !!(b && Array.isArray(b.card) && b.card.length === 4 &&
+            Array.isArray(b.nameRegion) && b.nameRegion.length === 4 &&
+            Array.isArray(b.numberRegion) && b.numberRegion.length === 4);
+}
+
 export function safeSlug(value) {
   return String(value || "")
     .trim()
@@ -332,11 +344,25 @@ export function applyMetaPatchToImage(img, patch) {
     if ("card" in patch) {
       const c = patch.card && typeof patch.card === "object" ? patch.card : {};
       next.card = {
-        ...(next.card || { setCode: "", number: "", name: "" }),
+        ...(next.card || { setCode: "", number: "", name: "", total: "" }),
         setCode: String(c.setCode ?? next.card?.setCode ?? ""),
         number: String(c.number ?? next.card?.number ?? ""),
         name: String(c.name ?? next.card?.name ?? ""),
+        total: String(c.total ?? next.card?.total ?? ""),
       };
+    }
+    if ("bbox" in patch) {
+      const b = patch.bbox;
+      if (b === null) {
+        next.bbox = null;
+      } else if (b && typeof b === "object") {
+        const validBox = (v) => Array.isArray(v) && v.length === 4 ? v.map(Number) : null;
+        next.bbox = {
+          card:         validBox(b.card)         ?? next.bbox?.card         ?? null,
+          nameRegion:   validBox(b.nameRegion)   ?? next.bbox?.nameRegion   ?? null,
+          numberRegion: validBox(b.numberRegion) ?? next.bbox?.numberRegion ?? null,
+        };
+      }
     }
   }
   return next;

@@ -1,185 +1,16 @@
-// FILE: apps/desktop/src/renderer/src/pages/TestPage.jsx
-//
-// UPDATED (2026-03-04) — v6 (GraphModel)
-//
-// CHANGES:
-// - Uses tf.loadGraphModel() instead of tf.loadLayersModel()
-// - No TFOpLambda registration needed (GraphModel uses raw ops, not Keras layers)
-// - GraphModel loads in seconds vs minutes for LayersModel
-// - Models load on button click only (page stays responsive)
-// - Dynamic import of TFJS (CSP-safe via Vite bundling)
-// - WebGL backend with CPU fallback
-//
-// REQUIRES: Re-export models using updated export_tfjs.py (GraphModel format)
-//           Then copy to workspace/tfjs/finish/ and workspace/tfjs/identity/
+// FILE: apps/desktop/src/renderer/src/pages/vl/TestPage.jsx
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Card from "./components/Card";
 import Button from "./components/Button";
+import { adminApi } from "../../lib/api";
 
 import "./assets/app.css";
 import "./assets/testPage.css";
 
-// =====================================================
-// TFJS lazy loading (no custom layer registration needed!)
-// =====================================================
+// ── UI components ─────────────────────────────────────────────────────────────
 
-let tf = null;
-let tfReadyPromise = null;
-
-function ensureTf() {
-  if (tf) return Promise.resolve(tf);
-  if (tfReadyPromise) return tfReadyPromise;
-
-  tfReadyPromise = (async () => {
-    console.log("[TestPage] Loading TFJS…");
-    const mod = await import("@tensorflow/tfjs");
-    tf = mod;
-    console.log("[TestPage] TFJS imported, version:", tf.version?.tfjs);
-
-    // No TFOpLambda registration — GraphModel doesn't need it!
-
-    try {
-      await tf.setBackend("webgl");
-    } catch {
-      console.warn("[TestPage] WebGL unavailable, using CPU");
-      await tf.setBackend("cpu");
-    }
-    await tf.ready();
-    console.log("[TestPage] Backend:", tf.getBackend());
-    return tf;
-  })();
-
-  return tfReadyPromise;
-}
-
-// =====================================================
-// IPC IOHandler for tf.loadGraphModel()
-// =====================================================
-
-/**
- * Returns a TFJS IOHandler that loads model files via Electron IPC.
- *
- * tf.loadGraphModel() expects the IOHandler to return:
- *   { modelTopology, weightSpecs, weightData, ... }
- *
- * Same as LayersModel but the topology is a GraphDef JSON (not Keras config).
- */
-function ipcModelLoader(modelName) {
-  return {
-    load: async () => {
-      console.log(`[IOHandler] Loading ${modelName}/model.json…`);
-      const mjRes = await window.visionlab.readModelFile({ modelName, fileName: "model.json" });
-      if (!mjRes?.ok) throw new Error(`model.json: ${mjRes?.error || "failed"}`);
-
-      const mj = mjRes.data;
-      if (!mj.modelTopology) throw new Error("Missing modelTopology");
-      if (!mj.weightsManifest?.length) throw new Error("Missing weightsManifest");
-
-      // Weight specs
-      const weightSpecs = [];
-      for (const g of mj.weightsManifest)
-        for (const w of g.weights || [])
-          weightSpecs.push({ name: w.name, shape: w.shape, dtype: w.dtype || "float32" });
-
-      // Load binary shards
-      const bufs = [];
-      let total = 0;
-      for (const g of mj.weightsManifest)
-        for (const p of g.paths || []) {
-          console.log(`[IOHandler] Loading ${modelName}/${p}…`);
-          const r = await window.visionlab.readModelFile({ modelName, fileName: p });
-          if (!r?.ok) throw new Error(`Shard ${p}: ${r?.error}`);
-          bufs.push(r.data);
-          total += r.data.byteLength;
-        }
-
-      // Concatenate shards
-      let weightData;
-      if (bufs.length === 1) {
-        weightData = bufs[0];
-      } else {
-        weightData = new ArrayBuffer(total);
-        const v = new Uint8Array(weightData);
-        let off = 0;
-        for (const b of bufs) { v.set(new Uint8Array(b), off); off += b.byteLength; }
-      }
-
-      console.log(`[IOHandler] ${modelName}: ${weightSpecs.length} weights, ${(total / 1024 / 1024).toFixed(1)} MB`);
-
-      return {
-        modelTopology: mj.modelTopology,
-        weightSpecs,
-        weightData,
-        format: mj.format || "graph-model",
-        generatedBy: mj.generatedBy || "unknown",
-        // GraphModel also uses the signature for input/output mapping
-        ...(mj.signature ? { userDefinedMetadata: { signature: mj.signature } } : {}),
-      };
-    },
-  };
-}
-
-// =====================================================
-// Preprocessing
-// =====================================================
-
-const IMAGE_SIZE = 224;
-
-/** MobileNetV3 preprocess_input: [0,255] → [-1,1] */
-function preprocessImage(imgEl) {
-  return tf.tidy(() => {
-    let t = tf.browser.fromPixels(imgEl);
-    t = tf.image.resizeBilinear(t, [IMAGE_SIZE, IMAGE_SIZE]);
-    return t.toFloat().div(127.5).sub(1.0).expandDims(0);
-  });
-}
-
-// =====================================================
-// UI components
-// =====================================================
-
-function ModelBadge({ name, state, numClasses, totalWeightBytes, error }) {
-  const dotCls =
-    state === "loaded" ? "dot ready"
-    : state === "loading" ? "dot loading"
-    : "dot missing";
-
-  const label =
-    state === "loaded" ? "Loaded"
-    : state === "loading" ? "Loading…"
-    : state === "error" ? "Error"
-    : state === "available" ? "Ready"
-    : "Not found";
-
-  const size = totalWeightBytes ? `${(totalWeightBytes / 1024 / 1024).toFixed(1)} MB` : "";
-
-  return (
-    <div className="vlTestModelBadge" title={error || ""}>
-      <span className={dotCls} />
-      <span className="modelName">{name}</span>
-      <span className="modelMeta">
-        {label}{numClasses ? ` · ${numClasses} cls` : ""}{size ? ` · ${size}` : ""}
-      </span>
-    </div>
-  );
-}
-
-function PredictionResults({ title, predictions, inferenceMs }) {
-  if (!predictions?.length) {
-    return (
-      <div className="vlTestResultSection">
-        <div className="vlTestResultHeader"><div className="vlTestResultTitle">{title}</div></div>
-        <div className="vlTestResultBody">
-          <div className="vlTestEmpty">
-            <div className="vlTestEmptyIcon">📊</div>
-            <div className="vlMutedSmall">Drop an image to see predictions</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+function ClassifierResults({ title, predictions, inferenceMs }) {
   return (
     <div className="vlTestResultSection">
       <div className="vlTestResultHeader">
@@ -187,182 +18,190 @@ function PredictionResults({ title, predictions, inferenceMs }) {
         {inferenceMs != null && <div className="vlTestResultTime">{inferenceMs.toFixed(0)} ms</div>}
       </div>
       <div className="vlTestResultBody">
-        {predictions.map((p, i) => (
-          <div key={p.label} className={`vlTestPredRow${i === 0 ? " top" : ""}`}>
-            <div className="vlTestPredRank">{i + 1}</div>
-            <div className="vlTestPredInfo">
-              <div className="vlTestPredLabel">{p.label}</div>
-              <div className="vlTestPredBar">
-                <div className="vlTestPredBarFill" style={{ width: `${Math.max(1, p.confidence * 100)}%` }} />
+        {predictions?.length ? (
+          predictions.map((p, i) => (
+            <div key={p.label} className={`vlTestPredRow${i === 0 ? " top" : ""}`}>
+              <div className="vlTestPredRank">{i + 1}</div>
+              <div className="vlTestPredInfo">
+                <div className="vlTestPredLabel">{p.label}</div>
+                <div className="vlTestPredBar">
+                  <div className="vlTestPredBarFill" style={{ width: `${Math.max(1, p.confidence * 100)}%` }} />
+                </div>
               </div>
+              <div className="vlTestPredConf">{(p.confidence * 100).toFixed(1)}%</div>
             </div>
-            <div className="vlTestPredConf">{(p.confidence * 100).toFixed(1)}%</div>
+          ))
+        ) : (
+          <div className="vlMutedSmall" style={{ padding: "8px 0" }}>
+            {predictions === null ? "Drop an image to see predictions" : "No predictions (model not trained yet)"}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 }
 
-// =====================================================
-// Main page
-// =====================================================
+function IdentityResult({ result, setMatches, setLoading, inferenceMs }) {
+  if (!result) return (
+    <div className="vlTestResultSection">
+      <div className="vlTestResultHeader"><div className="vlTestResultTitle">Identity (YOLO + OCR)</div></div>
+      <div className="vlTestResultBody">
+        <div className="vlMutedSmall" style={{ padding: "8px 0" }}>Drop an image to identify</div>
+      </div>
+    </div>
+  );
 
-const TOP_K = 5;
+  if (!result.ok) return (
+    <div className="vlTestResultSection">
+      <div className="vlTestResultHeader"><div className="vlTestResultTitle">Identity (YOLO + OCR)</div></div>
+      <div className="vlTestResultBody">
+        <div className="vlErrorBox" style={{ fontSize: 12 }}>{result.error}</div>
+      </div>
+    </div>
+  );
+
+  const detected   = result.detectedClasses || [];
+  const classNames = { 0: "card", 1: "name", 2: "number" };
+
+  return (
+    <div className="vlTestResultSection">
+      <div className="vlTestResultHeader">
+        <div className="vlTestResultTitle">Identity (YOLO + OCR)</div>
+        {inferenceMs != null && <div className="vlTestResultTime">{inferenceMs.toFixed(0)} ms</div>}
+      </div>
+      <div className="vlTestResultBody">
+        <div className="vlTestIdentityGrid">
+          <div className="vlTestIdentityRow">
+            <span className="vlTestIdentityLabel">Name</span>
+            <span className="vlTestIdentityValue">{result.name ?? <em className="vlMutedSmall">not read</em>}</span>
+          </div>
+          <div className="vlTestIdentityRow">
+            <span className="vlTestIdentityLabel">Number</span>
+            <span className="vlTestIdentityValue">
+              {result.number
+                ? <>{result.number}{result.total ? <span className="vlMutedSmall"> / {result.total}</span> : null}</>
+                : <em className="vlMutedSmall">not read</em>}
+            </span>
+          </div>
+          <div className="vlTestIdentityRow">
+            <span className="vlTestIdentityLabel">Detected</span>
+            <span className="vlTestIdentityValue" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {[0, 1, 2].map((c) => (
+                <span key={c} className={`vlBadge${detected.includes(c) ? " ok" : ""}`} style={{ fontSize: 11 }}>
+                  {classNames[c]}
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, borderTop: "1px solid var(--vl-border)", paddingTop: 10 }}>
+          <div className="vlMutedSmall" style={{ marginBottom: 6 }}>Set lookup</div>
+          {setLoading ? (
+            <div className="vlMutedSmall">Looking up sets…</div>
+          ) : setMatches === null ? (
+            <div className="vlMutedSmall">—</div>
+          ) : setMatches.length === 0 ? (
+            <div className="vlMutedSmall">No set found with {result.total} cards</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {setMatches.map((s) => (
+                <div key={s.code} className="vlTestSetMatch">
+                  <span className="vlMono" style={{ fontSize: 12 }}>{s.code}</span>
+                  <span style={{ marginLeft: 8, fontSize: 13 }}>{s.name}</span>
+                  {s.official_count != null && (
+                    <span className="vlMutedSmall" style={{ marginLeft: 6 }}>({s.official_count} cards)</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TestPage() {
-  const [catalog, setCatalog] = useState(null);
-  const [catalogErr, setCatalogErr] = useState(null);
-
-  const modelsRef = useRef({});
-  const labelsRef = useRef({});
-  const [ms, setMs] = useState({ finish: "init", identity: "init" });
-  const [me, setMe] = useState({});
-
-  const [imageUrl, setImageUrl] = useState(null);
-  const [fName, setFName] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [imageUrl, setImageUrl]     = useState(null);
+  const [fName, setFName]           = useState(null);
+  const [dragOver, setDragOver]     = useState(false);
   const imgRef = useRef(null);
 
-  const [running, setRunning] = useState(false);
-  const [finishRes, setFinishRes] = useState(null);
-  const [identityRes, setIdentityRes] = useState(null);
-  const [finishTime, setFinishTime] = useState(null);
-  const [identityTime, setIdentityTime] = useState(null);
-  const [inferErr, setInferErr] = useState(null);
+  const [running, setRunning]       = useState(false);
+  const [inferErr, setInferErr]     = useState(null);
+  const [inferenceMs, setInferenceMs] = useState(null);
 
-  // Catalog on mount (lightweight IPC only)
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await window.visionlab.listModels();
-        if (!r?.ok) throw new Error(r?.error || "listModels failed");
-        setCatalog(r.models);
-        const st = {};
-        for (const m of r.models) st[m.name] = m.ready ? "available" : "init";
-        setMs((p) => ({ ...p, ...st }));
-      } catch (e) {
-        setCatalogErr(String(e?.message || e));
-      }
-    })();
+  const [identityRes, setIdentityRes] = useState(null);
+  const [setMatches, setSetMatches]   = useState(null);
+  const [setLoading, setSetLoading]   = useState(false);
+
+  const lookupSet = useCallback(async (total) => {
+    if (!total) { setSetMatches(null); return; }
+    setSetLoading(true);
+    setSetMatches(null);
+    try {
+      const resp = await adminApi.getCatalogSets({ pageSize: 500 });
+      const sets = Array.isArray(resp) ? resp : (resp?.sets ?? resp?.data ?? []);
+      const n    = parseInt(total, 10);
+      setSetMatches(sets.filter((s) => {
+        const count = s.official_count ?? s.total_cards ?? s.ingested_cards;
+        return count === n;
+      }));
+    } catch (e) {
+      console.error("[TestPage] set lookup:", e);
+      setSetMatches([]);
+    } finally {
+      setSetLoading(false);
+    }
   }, []);
 
-  // Load one model (button-triggered)
-  const loadOne = useCallback(async (name) => {
-    const info = catalog?.find((m) => m.name === name);
-    if (!info?.ready) return;
-
-    setMs((p) => ({ ...p, [name]: "loading" }));
-    setMe((p) => ({ ...p, [name]: null }));
-
-    try {
-      const tfMod = await ensureTf();
-      console.log(`[TestPage] Loading "${name}" as GraphModel…`);
-      const t0 = performance.now();
-
-      // GraphModel — no Keras layer deserialization, no TFOpLambda
-      const model = await tfMod.loadGraphModel(ipcModelLoader(name));
-
-      const sec = ((performance.now() - t0) / 1000).toFixed(1);
-      console.log(`[TestPage] "${name}" loaded in ${sec}s`);
-
-      modelsRef.current[name] = model;
-      labelsRef.current[name] = info.labels || [];
-      setMs((p) => ({ ...p, [name]: "loaded" }));
-    } catch (e) {
-      console.error(`[TestPage] "${name}" failed:`, e);
-      setMs((p) => ({ ...p, [name]: "error" }));
-      setMe((p) => ({ ...p, [name]: String(e?.message || e) }));
-    }
-  }, [catalog]);
-
-  const loadAll = useCallback(async () => {
-    if (!catalog) return;
-    for (const m of catalog) {
-      if (m.ready && ms[m.name] !== "loaded" && ms[m.name] !== "loading") {
-        await loadOne(m.name);
-      }
-    }
-  }, [catalog, ms, loadOne]);
-
-  const anyLoaded = ms.finish === "loaded" || ms.identity === "loaded";
-  const anyLoading = ms.finish === "loading" || ms.identity === "loading";
-  const canLoad = catalog?.some((m) => m.ready && ms[m.name] !== "loaded" && ms[m.name] !== "loading");
-
-  // Inference
-  const runInference = useCallback(async () => {
-    const img = imgRef.current;
-    if (!img?.complete || !img.naturalWidth || !tf || !anyLoaded) return;
-
+  const runInference = useCallback(async (dataUrl) => {
     setRunning(true);
     setInferErr(null);
+    setIdentityRes(null);
+    setSetMatches(null);
 
     try {
-      const input = preprocessImage(img);
-
-      if (ms.finish === "loaded" && modelsRef.current.finish) {
-        const m = modelsRef.current.finish;
-        console.log("[TestPage] finish model inputs:", m.inputNodes);
-        console.log("[TestPage] finish model outputs:", m.outputNodes);
-        const t0 = performance.now();
-        // GraphModel: use execute() with explicit output node names
-        const results = m.execute(input);
-        console.log("[TestPage] finish execute() returned:", results, typeof results, Array.isArray(results));
-        const pred = Array.isArray(results) ? results[0] : results;
-        const data = await pred.data();
-        setFinishTime(performance.now() - t0);
-        if (Array.isArray(results)) results.forEach(t => t?.dispose?.());
-        else if (results?.dispose) results.dispose();
-        setFinishRes(topK(data, labelsRef.current.finish || [], TOP_K));
-      }
-
-      if (ms.identity === "loaded" && modelsRef.current.identity) {
-        const m = modelsRef.current.identity;
-        const t0 = performance.now();
-        const results = m.execute(input);
-        const pred = Array.isArray(results) ? results[0] : results;
-        const data = await pred.data();
-        setIdentityTime(performance.now() - t0);
-        if (Array.isArray(results)) results.forEach(t => t?.dispose?.());
-        else if (results?.dispose) results.dispose();
-        setIdentityRes(topK(data, labelsRef.current.identity || [], TOP_K));
-      }
-
-      input.dispose();
+      const t0     = performance.now();
+      const result = await window.visionlab.identify({ imageDataUrl: dataUrl });
+      setInferenceMs(performance.now() - t0);
+      setIdentityRes(result);
+      if (result?.ok && result.total) lookupSet(result.total);
     } catch (e) {
-      console.error("[TestPage] inference:", e);
       setInferErr(String(e?.message || e));
     } finally {
       setRunning(false);
     }
-  }, [ms, anyLoaded]);
+  }, [lookupSet]);
 
   // Image helpers
   const loadFile = useCallback((file) => {
     if (!file) return;
     setFName(file.name || "image");
-    setFinishRes(null); setIdentityRes(null);
-    setFinishTime(null); setIdentityTime(null);
-    setInferErr(null);
+    setIdentityRes(null); setSetMatches(null); setInferErr(null); setInferenceMs(null);
     const r = new FileReader();
     r.onload = (e) => setImageUrl(e.target.result);
     r.readAsDataURL(file);
   }, []);
 
-  const onImgLoad = useCallback(() => { runInference(); }, [runInference]);
+  const onImgLoad = useCallback(() => {
+    if (imageUrl) runInference(imageUrl);
+  }, [imageUrl, runInference]);
+
   const clearImg = useCallback(() => {
     setImageUrl(null); setFName(null);
-    setFinishRes(null); setIdentityRes(null);
-    setFinishTime(null); setIdentityTime(null);
-    setInferErr(null);
+    setIdentityRes(null); setSetMatches(null); setInferErr(null); setInferenceMs(null);
   }, []);
 
-  const onDragOver = useCallback((e) => { e.preventDefault(); setDragOver(true); }, []);
+  const onDragOver  = useCallback((e) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e) => { e.preventDefault(); setDragOver(false); }, []);
-  const onDrop = useCallback((e) => {
+  const onDrop      = useCallback((e) => {
     e.preventDefault(); setDragOver(false);
     const f = Array.from(e.dataTransfer?.files || []).find((f) =>
-      ["image/jpeg","image/png","image/webp"].includes(f.type));
+      ["image/jpeg", "image/png", "image/webp"].includes(f.type));
     if (f) loadFile(f);
   }, [loadFile]);
   const onClickDrop = useCallback(() => {
@@ -382,92 +221,74 @@ export default function TestPage() {
     return () => window.removeEventListener("paste", h);
   }, [loadFile]);
 
-  const finishInfo = useMemo(() => catalog?.find((m) => m.name === "finish"), [catalog]);
-  const identityInfo = useMemo(() => catalog?.find((m) => m.name === "identity"), [catalog]);
+  const finishPreds = identityRes?.ok ? (identityRes.finish ?? []) : null;
+  const stampsPreds = identityRes?.ok ? (identityRes.stamps ?? []) : null;
 
   return (
     <div className="vlTestPage">
       <div className="vlTestSplit">
+
+        {/* ── Left: drop zone ─────────────────────────────────────────── */}
         <div className="vlTestLeft">
           <Card
             title="Test Inference"
-            subtitle="Drop or paste a card image to classify"
+            subtitle="YOLO detection + OCR identity + finish and stamps classifiers"
             right={
               <div className="vlRow" style={{ gap: 8 }}>
                 {imageUrl && <Button variant="secondary" onClick={clearImg}>Clear</Button>}
-                {imageUrl && anyLoaded && <Button onClick={runInference} disabled={running}>Re-run</Button>}
+                {imageUrl && <Button onClick={() => runInference(imageUrl)} disabled={running}>Re-run</Button>}
               </div>
             }
           >
-            <div className="vlRow" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <ModelBadge name="Finish" state={ms.finish} numClasses={finishInfo?.numClasses}
-                totalWeightBytes={finishInfo?.totalWeightBytes} error={me.finish} />
-              <ModelBadge name="Identity" state={ms.identity} numClasses={identityInfo?.numClasses}
-                totalWeightBytes={identityInfo?.totalWeightBytes} error={me.identity} />
-              {canLoad && (
-                <Button variant="secondary" onClick={loadAll} disabled={anyLoading}>
-                  {anyLoading ? "Loading…" : "Load Models"}
-                </Button>
-              )}
-            </div>
-
-            {catalogErr && <div className="vlErrorBox" style={{ marginTop: 10 }}>{catalogErr}</div>}
-            {me.finish && ms.finish === "error" && (
-              <div className="vlErrorBox" style={{ marginTop: 10, fontSize: 12 }}>
-                <strong>Finish:</strong> {me.finish}
-              </div>
-            )}
-            {me.identity && ms.identity === "error" && (
-              <div className="vlErrorBox" style={{ marginTop: 10, fontSize: 12 }}>
-                <strong>Identity:</strong> {me.identity}
-              </div>
-            )}
-
             <div
               className={["vlTestDropArea", dragOver ? "over" : "", imageUrl ? "hasImage" : ""].filter(Boolean).join(" ")}
               onDragOver={onDragOver} onDragEnter={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-              onClick={onClickDrop} style={{ marginTop: 12 }}
+              onClick={onClickDrop}
             >
               {imageUrl ? (
                 <>
                   <img ref={imgRef} src={imageUrl} alt={fName || "image"}
                     className="vlTestPreviewImg" onLoad={onImgLoad} crossOrigin="anonymous" />
-                  <button className="vlTestClearBtn" onClick={(e) => { e.stopPropagation(); clearImg(); }}>✕ Clear</button>
+                  <button className="vlTestClearBtn" onClick={(e) => { e.stopPropagation(); clearImg(); }}>✕</button>
                 </>
               ) : (
                 <>
                   <div className="vlTestDropIcon">🃏</div>
                   <div className="vlTestDropLabel">Drop a card image here</div>
-                  <div className="vlTestDropHint">or click to pick · paste with Ctrl+V · .jpg .png .webp</div>
-                  {!anyLoaded && <div className="vlTestDropHint" style={{ marginTop: 6, fontWeight: 700 }}>Click "Load Models" first ↑</div>}
+                  <div className="vlTestDropHint">or click to pick · paste Ctrl+V · .jpg .png .webp</div>
                 </>
               )}
             </div>
 
             {fName && <div className="vlMutedSmall" style={{ marginTop: 8 }}><code>{fName}</code></div>}
+
+            {!imageUrl && (
+              <div className="vlMutedSmall" style={{ marginTop: 12 }}>
+                Runs YOLO + EasyOCR for identity, TFLite classifiers for finish and stamps.
+                Train and export models first if not available.
+              </div>
+            )}
           </Card>
         </div>
 
+        {/* ── Right: results ──────────────────────────────────────────── */}
         <div className="vlTestRight">
-          {running && <div className="vlTestRunning"><div className="vlTestSpinner" />Running inference…</div>}
-          {inferErr && <div className="vlErrorBox">{inferErr}</div>}
-          <PredictionResults title="Finish Classifier" predictions={finishRes} inferenceMs={finishTime} />
-          <PredictionResults title="Identity Classifier" predictions={identityRes} inferenceMs={identityTime} />
-          {!imageUrl && !running && (
-            <div style={{ marginTop: 12 }}>
-              <div className="vlMutedSmall">Models load from workspace <code>tfjs/</code>. Train and export first if not available.</div>
-              <div className="vlMutedSmall" style={{ marginTop: 8 }}>Input: 224×224 RGB · MobileNetV3 preprocessing · Backend: WebGL</div>
-            </div>
+          {running && (
+            <div className="vlTestRunning"><div className="vlTestSpinner" />Running inference…</div>
           )}
+          {inferErr && <div className="vlErrorBox" style={{ marginBottom: 8 }}>{inferErr}</div>}
+
+          <IdentityResult
+            result={identityRes}
+            setMatches={setMatches}
+            setLoading={setLoading}
+            inferenceMs={inferenceMs}
+          />
+          <ClassifierResults title="Finish Classifier" predictions={finishPreds} />
+          <ClassifierResults title="Stamps Classifier" predictions={stampsPreds} />
         </div>
+
       </div>
     </div>
   );
-}
-
-function topK(probs, labels, k = 5) {
-  return Array.from(probs)
-    .map((p, i) => ({ index: i, confidence: p, label: labels[i] || `class_${i}` }))
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, k);
 }

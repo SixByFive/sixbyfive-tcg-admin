@@ -60,6 +60,7 @@ const visionlabAPI = {
 
   listModels:    ()        => ipcRenderer.invoke('visionlab:listModels'),
   readModelFile: (payload) => ipcRenderer.invoke('visionlab:readModelFile', payload),
+  identify:      (payload) => ipcRenderer.invoke('visionlab:identify', payload),
 
   listTrainingRuns:     ()      => ipcRenderer.invoke('visionlab:listTrainingRuns'),
   getTrainingRunDetail: (runId) => ipcRenderer.invoke('visionlab:getTrainingRunDetail', runId),
@@ -132,6 +133,29 @@ const releaseAPI = {
   triggerWorkflow: (projectId, ref)      => ipcRenderer.invoke('release:triggerWorkflow', { projectId, ref }),
 }
 
+const marketingAPI = {
+  listModels:          ()        => ipcRenderer.invoke('marketing:ollama:listModels'),
+  generateCampaign:    (payload) => ipcRenderer.invoke('marketing:ollama:generateCampaign', payload),
+  getActiveCampaign:   ()        => ipcRenderer.invoke('marketing:campaign:getActive'),
+  listCampaigns:       ()        => ipcRenderer.invoke('marketing:campaign:list'),
+  saveCampaign:        (payload) => ipcRenderer.invoke('marketing:campaign:save', payload),
+  deleteCampaign:      (id)      => ipcRenderer.invoke('marketing:campaign:delete', id),
+  getBufferConnection: ()        => ipcRenderer.invoke('marketing:buffer:getConnection'),
+  connectBuffer:       (apiKey)  => ipcRenderer.invoke('marketing:buffer:connect', { apiKey }),
+  publishBuffer:       (payload) => ipcRenderer.invoke('marketing:buffer:publish', payload),
+  syncBufferMetrics:   ()        => ipcRenderer.invoke('marketing:buffer:syncMetrics'),
+  videoStatus:         ()        => ipcRenderer.invoke('marketing:video:status'),
+  setupVideoNode:      ()        => ipcRenderer.invoke('marketing:video:setup'),
+  startComfyUi:        ()        => ipcRenderer.invoke('marketing:video:startComfy'),
+  renderMotionVideo:   (payload) => ipcRenderer.invoke('marketing:video:renderMotion', payload),
+  revealVideo:         (path)    => ipcRenderer.invoke('marketing:video:revealOutput', path),
+  onVideoStatus: (cb) => {
+    const h = (_, payload) => cb(payload)
+    ipcRenderer.on('marketing:video:status', h)
+    return () => ipcRenderer.removeListener('marketing:video:status', h)
+  },
+}
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -142,6 +166,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('permissions', permissionsAPI)
     contextBridge.exposeInMainWorld('ssh', sshAPI)
     contextBridge.exposeInMainWorld('releaseManager', releaseAPI)
+    contextBridge.exposeInMainWorld('marketing', marketingAPI)
   } catch (error) {
     console.error(error)
   }
@@ -162,4 +187,6 @@ if (process.contextIsolated) {
   window.ssh = sshAPI
   // @ts-ignore
   window.releaseManager = releaseAPI
+  // @ts-ignore
+  window.marketing = marketingAPI
 }

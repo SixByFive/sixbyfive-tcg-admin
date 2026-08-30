@@ -9,6 +9,9 @@ import { FinancialsPage } from '@/pages/FinancialsPage'
 import { ReportedUsersPage } from '@/pages/ReportedUsersPage'
 import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
+import { MarketingHubPage } from '@/pages/MarketingHubPage'
+import { MarketingHistoryPage } from '@/pages/MarketingHistoryPage'
+import { MarketingVideoPage } from '@/pages/MarketingVideoPage'
 import { BindersPage } from '@/pages/BindersPage'
 import { CollectionsPage } from '@/pages/CollectionsPage'
 import { ProductsPage } from '@/pages/ProductsPage'
@@ -47,8 +50,6 @@ export const router = createHashRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/status" replace /> },
-
-      // ── TCG Admin ──────────────────────────────────────────────────────────
       {
         path: 'tcg',
         children: [
@@ -61,6 +62,9 @@ export const router = createHashRouter([
           { path: 'reported-users', element: <ReportedUsersPage /> },
           { path: 'audit-logs',     element: <AuditLogsPage /> },
           { path: 'notifications',  element: <NotificationsPage /> },
+          { path: 'marketing',      element: <MarketingHubPage /> },
+          { path: 'marketing/history', element: <MarketingHistoryPage /> },
+          { path: 'marketing/video', element: <MarketingVideoPage /> },
           { path: 'binders',        element: <BindersPage /> },
           { path: 'collections',    element: <CollectionsPage /> },
           { path: 'products',       element: <ProductsPage /> },
@@ -74,8 +78,6 @@ export const router = createHashRouter([
           { path: 'mailboxes',      element: <MailboxesPage /> },
         ],
       },
-
-      // ── Kora Admin — Phase 1 ───────────────────────────────────────────────
       {
         path: 'kora',
         element: <KoraSection />,
@@ -88,20 +90,10 @@ export const router = createHashRouter([
           { path: 'mailboxes',  element: <KoraMailboxesPage /> },
         ],
       },
-
-      // ── Vault ─────────────────────────────────────────────────────────────────
       { path: 'vault', element: <VaultPage /> },
-
-      // ── Status ────────────────────────────────────────────────────────────────
       { path: 'status', element: <StatusBoardPage /> },
-
-      // ── Snippets ──────────────────────────────────────────────────────────────
       { path: 'snippets', element: <SnippetsPage /> },
-
-      // ── Release Manager ───────────────────────────────────────────────────────
       { path: 'release', element: <ReleaseManagerPage /> },
-
-      // ── SSH Terminal ──────────────────────────────────────────────────────────
       {
         path: 'ssh',
         children: [
@@ -110,8 +102,6 @@ export const router = createHashRouter([
           { path: 'connections', element: <SshConnectionsPage /> },
         ],
       },
-
-      // ── Vision Lab ────────────────────────────────────────────────────────────
       {
         path: 'vl',
         children: [

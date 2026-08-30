@@ -3,6 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers as registerVlIpcHandlers } from './vl/registerIpcHandlers.js'
+import { registerMarketingIpcHandlers } from './marketing/ollama.handlers.js'
+import { registerMarketingVideoIpcHandlers } from './marketing/video.handlers.js'
 import {
   vaultList,
   vaultGetPassword,
@@ -51,6 +53,7 @@ import {
 import { ensureWorkspaceOnStartup, getWorkspacePath } from './vl/services/workspace.service.js'
 import { startWorkspaceWatcher } from './vl/services/workspaceWatcher.service.js'
 import { flushManifest } from './vl/services/manifest.service.js'
+import { stopInferenceServer } from './vl/services/inference.service.js'
 
 // electron-builder only bakes resources/icon.ico into packaged builds —
 // BrowserWindow needs it set explicitly so the taskbar/title bar icon
@@ -132,6 +135,8 @@ app.whenReady().then(() => {
   })
 
   registerVlIpcHandlers()
+  registerMarketingIpcHandlers()
+  registerMarketingVideoIpcHandlers()
 
   ipcMain.handle('vault:list',             vaultList)
   ipcMain.handle('vault:getPassword',      vaultGetPassword)
@@ -191,6 +196,7 @@ app.on('before-quit', (e) => {
   e.preventDefault()
   ;(async () => {
     try {
+      stopInferenceServer()
       const wp = getWorkspacePath()
       await flushManifest(wp)
     } catch {

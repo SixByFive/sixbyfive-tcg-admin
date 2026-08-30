@@ -59,7 +59,7 @@ export async function startTraining(_, args = {}) {
       return { ok: false, error: "No workspace selected." };
     }
 
-    // Export training datasets from manifest into identity_raw / finish_raw before training
+    // Export training datasets from manifest into detection_raw / finish_raw / stamps_raw before training
     try {
       const exportResult = await exportTrainingDatasets(workspacePath, { clean: true, prefer: "copy" });
       if (!exportResult.ok) {

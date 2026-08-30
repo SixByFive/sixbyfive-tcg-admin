@@ -21,7 +21,7 @@ import path from "node:path";
 
 import { ensureWorkspaceOnStartup } from "../services/workspace.service.js";
 
-const TFJS_MODEL_NAMES = ["identity", "finish"];
+const TFJS_MODEL_NAMES = ["finish", "stamps"];
 
 /**
  * List available TFJS models under workspace/tfjs/
@@ -101,7 +101,7 @@ export async function listModels() {
 /**
  * Read a single file from a TFJS model directory.
  *
- * payload: { modelName: "finish" | "identity", fileName: "model.json" | "labels.json" | "group1-shard1of1.bin" }
+ * payload: { modelName: "finish" | "stamps", fileName: "model.json" | "labels.json" | "group1-shard1of1.bin" }
  *
  * Returns:
  *   For .json files:  { ok, type: "json", data: <parsed object> }

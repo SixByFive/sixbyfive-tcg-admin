@@ -9,6 +9,7 @@ import {
   Flag,
   ScrollText,
   Bell,
+  Megaphone,
   BookOpen,
   Library,
   Package,
@@ -95,6 +96,12 @@ const tcgNavGroups: NavGroup[] = [
       { to: '/tcg/sets',        label: 'Set Ingestion', icon: Database },
       { to: '/tcg/binders',     label: 'Binders',       icon: BookOpen },
       { to: '/tcg/collections', label: 'Collections',   icon: Library },
+    ],
+  },
+  {
+    label: 'Growth',
+    items: [
+      { to: '/tcg/marketing', label: 'Marketing', icon: Megaphone },
     ],
   },
   {
