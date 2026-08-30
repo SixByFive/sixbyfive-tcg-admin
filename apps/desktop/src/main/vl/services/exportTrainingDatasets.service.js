@@ -1,20 +1,26 @@
 // FILE: apps/desktop/src/main/services/exportTrainingDatasets.service.js
 //
-// NEW (2026-03-01)
-// UPDATED (2026-03-28) — resize images to 512px on export to reduce network load
+// Exports training datasets from the Vision Lab manifest into:
 //
-// Purpose:
-//   Export training datasets from the Vision Lab manifest into:
-//     - datasets/identity_raw/<set-number>/file.jpg
-//     - datasets/finish_raw/<finish>/file.jpg
+//   datasets/detection_raw/          — YOLO format (card + nameRegion + numberRegion)
+//     images/  *.jpg
+//     labels/  *.txt  (class cx cy w h, all values normalized 0–1)
+//
+//   datasets/finish_raw/<finish>/    — classifier, one folder per finish
+//
+//   datasets/stamps_raw/<stamp>/     — classifier, one folder per stamp
+//                                      ("none" for images with no stamps)
+//
+// YOLO class map:
+//   0 = card
+//   1 = nameRegion
+//   2 = numberRegion
 //
 // Notes:
-// - Resizes images to max 512px (longest side) using sharp before writing.
-//   The model trains at 224px so full-res 7MB images are wasteful on the network.
-// - Falls back to plain copy if sharp fails.
-// - Only includes PROCESSED + LABELED images (so finish/name/set/number exist).
-// - Expects canonical filename pattern you already use:
-//     "<setCode>-<number>__<name>__<finish>__<stamps>__<id>.jpg"
+// - Images are resized to max 512px (longest side) before export.
+// - Detection export skips images without bbox annotations.
+// - Finish/stamp export skips images without processedFile.
+// - All three datasets are cleaned and rebuilt on each call (clean: true default).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -23,68 +29,81 @@ import sharp from "sharp";
 import {
   readManifest,
   isLabeled,
+  isBboxLabeled,
   normalizeDatasetRel,
   resolveAbsFromManifestFile,
   safeSlug,
   normalizeFinish,
+  normalizeStamp,
 } from "./manifest.service.js";
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function ensureDir(abs) {
   if (!fs.existsSync(abs)) fs.mkdirSync(abs, { recursive: true });
 }
 
 function rmDir(abs) {
-  try {
-    fs.rmSync(abs, { recursive: true, force: true });
-  } catch {}
+  try { fs.rmSync(abs, { recursive: true, force: true }); } catch {}
 }
 
-function linkOrCopy(srcAbs, dstAbs, prefer = "hardlink") {
-  if (fs.existsSync(dstAbs)) return { modeUsed: "skip_exists" };
-
+async function resizeAndCopy(srcAbs, dstAbs, cardBbox = null) {
   ensureDir(path.dirname(dstAbs));
-
-  if (prefer === "hardlink") {
-    try {
-      fs.linkSync(srcAbs, dstAbs);
-      return { modeUsed: "hardlink" };
-    } catch {
-      // fall through
+  try {
+    let pipeline = sharp(srcAbs);
+    // Crop to card bbox before resizing so classifiers train on card-only pixels
+    if (cardBbox && Array.isArray(cardBbox) && cardBbox.length === 4) {
+      const [x, y, w, h] = cardBbox.map(Math.round);
+      if (w > 4 && h > 4) {
+        pipeline = pipeline.extract({ left: Math.max(0, x), top: Math.max(0, y), width: w, height: h });
+      }
     }
-  }
-
-  fs.copyFileSync(srcAbs, dstAbs);
-  return { modeUsed: "copy" };
-}
-
-/**
- * Resize image to max 512px on longest side and write as JPEG.
- * Falls back to plain copy if sharp fails.
- */
-async function resizeAndCopy(srcAbs, dstAbs) {
-  ensureDir(path.dirname(dstAbs));
-  try {
-    await sharp(srcAbs)
+    await pipeline
       .resize(512, 512, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 90 })
       .toFile(dstAbs);
-    return { modeUsed: "resize" };
+    return "resize";
   } catch {
     fs.copyFileSync(srcAbs, dstAbs);
-    return { modeUsed: "copy_fallback" };
+    return "copy_fallback";
   }
 }
 
-function getIdentityKey(img) {
-  const setCode = safeSlug(img?.card?.setCode) || "unknown_set";
-  const number = safeSlug(img?.card?.number) || "000";
-  return `${setCode}-${number}`;
+async function getImageDimensions(srcAbs) {
+  try {
+    const meta = await sharp(srcAbs).metadata();
+    return { w: meta.width, h: meta.height };
+  } catch {
+    return null;
+  }
+}
+
+// bbox is [x, y, w, h] in pixels (top-left origin, pre-resize)
+// We re-derive cx/cy/nw/nh from pixel values but we need the *resized* dims.
+// Since we resize to fit 512px on the longest side, scale factor is the same
+// for both axes — the YOLO ratios are invariant to uniform scaling, so we can
+// compute them from original pixel dimensions directly.
+function toYoloLine(classId, bbox, imgW, imgH) {
+  const [x, y, w, h] = bbox;
+  const cx = (x + w / 2) / imgW;
+  const cy = (y + h / 2) / imgH;
+  const nw = w / imgW;
+  const nh = h / imgH;
+  return `${classId} ${cx.toFixed(6)} ${cy.toFixed(6)} ${nw.toFixed(6)} ${nh.toFixed(6)}`;
 }
 
 function getFinishKey(img) {
-  const fin = normalizeFinish(img?.finish) || "unknown";
-  return safeSlug(fin) || "unknown";
+  return safeSlug(normalizeFinish(img?.finish) || "unknown") || "unknown";
 }
+
+function getStampKeys(img) {
+  const stamps = Array.isArray(img?.stamps) ? img.stamps : [];
+  const norm = stamps.map(normalizeStamp).filter(Boolean);
+  const uniq = Array.from(new Set(norm));
+  return uniq.length > 0 ? uniq : ["none"];
+}
+
+// ── Main export ────────────────────────────────────────────────────────────────
 
 /**
  * @param {string} workspacePath
@@ -95,117 +114,135 @@ function getFinishKey(img) {
  * }} opts
  */
 export async function exportTrainingDatasets(workspacePath, opts = {}) {
-  const datasetsRoot = path.join(workspacePath, "datasets");
+  const datasetsRoot     = path.join(workspacePath, "datasets");
+  const detectionRawAbs  = path.join(datasetsRoot, "detection_raw");
+  const finishRawAbs     = path.join(datasetsRoot, "finish_raw");
+  const stampsRawAbs     = path.join(datasetsRoot, "stamps_raw");
 
-  const identityRawAbs = path.join(datasetsRoot, "identity_raw");
-  const finishRawAbs = path.join(datasetsRoot, "finish_raw");
-
-  const clean = opts.clean !== false; // default true
-  const prefer = opts.prefer === "copy" ? "copy" : "hardlink";
-  const includeProcessedOnly = opts.includeProcessedOnly !== false; // default true
+  const clean               = opts.clean !== false;
+  const includeProcessedOnly = opts.includeProcessedOnly !== false;
 
   const report = {
     ok: true,
     workspacePath,
-    prefer,
-    includeProcessedOnly,
-    paths: { identityRawAbs, finishRawAbs },
-    used: { hardlink: 0, copy: 0, skip_exists: 0, resize: 0, copy_fallback: 0 },
+    paths: { detectionRawAbs, finishRawAbs, stampsRawAbs },
     counts: {
       scanned: 0,
       eligible: 0,
-      identityFiles: 0,
+      detectionFiles: 0,
       finishFiles: 0,
-      skipped: 0,
-      missingOnDisk: 0,
+      stampFiles: 0,
+      skippedNoBbox: 0,
+      skippedUnlabeled: 0,
+      skippedMissingFile: 0,
       errors: 0,
     },
     errors: [],
   };
 
   const manifest = readManifest(workspacePath);
-  const images = Array.isArray(manifest.images) ? manifest.images : [];
+  const images   = Array.isArray(manifest.images) ? manifest.images : [];
   report.counts.scanned = images.length;
 
   if (clean) {
-    rmDir(identityRawAbs);
+    rmDir(detectionRawAbs);
     rmDir(finishRawAbs);
+    rmDir(stampsRawAbs);
   }
-  ensureDir(identityRawAbs);
+
+  ensureDir(path.join(detectionRawAbs, "images"));
+  ensureDir(path.join(detectionRawAbs, "labels"));
   ensureDir(finishRawAbs);
+  ensureDir(stampsRawAbs);
 
   for (const img of images) {
     try {
-      if (!img || typeof img !== "object") {
-        report.counts.skipped++;
-        continue;
-      }
+      if (!img || typeof img !== "object") continue;
 
-      if (!isLabeled(img)) {
-        report.counts.skipped++;
-        continue;
-      }
-
-      // Require processed marker so we only train from finalized images
-      if (includeProcessedOnly && !img.processedFile) {
-        report.counts.skipped++;
+      const srcAbs = resolveAbsFromManifestFile(workspacePath, img.file);
+      if (!srcAbs || !fs.existsSync(srcAbs)) {
+        report.counts.skippedMissingFile++;
         continue;
       }
 
       const rel = normalizeDatasetRel(img.file || "");
       if (includeProcessedOnly && !rel.startsWith("processed/")) {
-        report.counts.skipped++;
+        report.counts.skippedUnlabeled++;
         continue;
       }
 
-      const srcAbs = resolveAbsFromManifestFile(workspacePath, img.file);
-      if (!srcAbs || !fs.existsSync(srcAbs)) {
-        report.counts.missingOnDisk++;
+      const base = path.basename(srcAbs, path.extname(srcAbs)) + ".jpg";
+
+      // ── Detection (YOLO) ───────────────────────────────────────────────────
+      // Requires bbox annotation
+      if (isBboxLabeled(img)) {
+        const dims = await getImageDimensions(srcAbs);
+        if (dims) {
+          const imgDst   = path.join(detectionRawAbs, "images", base);
+          const labelDst = path.join(detectionRawAbs, "labels", base.replace(/\.jpg$/, ".txt"));
+
+          if (!fs.existsSync(imgDst)) {
+            await resizeAndCopy(srcAbs, imgDst);
+          }
+
+          if (!fs.existsSync(labelDst)) {
+            const lines = [
+              toYoloLine(0, img.bbox.card,         dims.w, dims.h),
+              toYoloLine(1, img.bbox.nameRegion,   dims.w, dims.h),
+              toYoloLine(2, img.bbox.numberRegion, dims.w, dims.h),
+            ];
+            fs.writeFileSync(labelDst, lines.join("\n") + "\n", "utf8");
+          }
+
+          report.counts.detectionFiles++;
+        }
+      } else {
+        report.counts.skippedNoBbox++;
+      }
+
+      // Finish and stamp exports require full labeling
+      if (!isLabeled(img)) {
+        report.counts.skippedUnlabeled++;
         continue;
       }
 
       report.counts.eligible++;
 
-      // Normalise to .jpg for resized outputs
-      const base = path.basename(srcAbs, path.extname(srcAbs)) + ".jpg";
+      // Card bbox crop — used by finish and stamps classifiers when available
+      const cardBbox = Array.isArray(img.bbox?.card) && img.bbox.card.length === 4
+        ? img.bbox.card
+        : null;
 
-      // identity_raw/<set-number>/<file>
-      const identityKey = getIdentityKey(img);
-      const dstIdAbs = path.join(identityRawAbs, identityKey, base);
-      let r1;
-      if (fs.existsSync(dstIdAbs)) {
-        r1 = { modeUsed: "skip_exists" };
-      } else {
-        r1 = await resizeAndCopy(srcAbs, dstIdAbs);
-      }
-      report.used[r1.modeUsed] = (report.used[r1.modeUsed] || 0) + 1;
-      report.counts.identityFiles++;
-
-      // finish_raw/<finish>/<file>
+      // ── Finish classifier ──────────────────────────────────────────────────
       const finishKey = getFinishKey(img);
-      const dstFinAbs = path.join(finishRawAbs, finishKey, base);
-      let r2;
-      if (fs.existsSync(dstFinAbs)) {
-        r2 = { modeUsed: "skip_exists" };
-      } else {
-        r2 = await resizeAndCopy(srcAbs, dstFinAbs);
+      const finishDst = path.join(finishRawAbs, finishKey, base);
+      if (!fs.existsSync(finishDst)) {
+        await resizeAndCopy(srcAbs, finishDst, cardBbox);
       }
-      report.used[r2.modeUsed] = (report.used[r2.modeUsed] || 0) + 1;
       report.counts.finishFiles++;
+
+      // ── Stamps classifier ──────────────────────────────────────────────────
+      for (const stampKey of getStampKeys(img)) {
+        const stampDst = path.join(stampsRawAbs, stampKey, base);
+        if (!fs.existsSync(stampDst)) {
+          await resizeAndCopy(srcAbs, stampDst, cardBbox);
+        }
+        report.counts.stampFiles++;
+      }
     } catch (e) {
       report.counts.errors++;
       report.errors.push(String(e?.message || e));
     }
   }
 
-  // Basic sanity
-  const hasIdentity = fs.existsSync(identityRawAbs) && fs.readdirSync(identityRawAbs).length > 0;
-  const hasFinish = fs.existsSync(finishRawAbs) && fs.readdirSync(finishRawAbs).length > 0;
+  const hasDetection = fs.readdirSync(path.join(detectionRawAbs, "images")).length > 0;
+  const hasFinish    = fs.existsSync(finishRawAbs) && fs.readdirSync(finishRawAbs).length > 0;
+  const hasStamps    = fs.existsSync(stampsRawAbs) && fs.readdirSync(stampsRawAbs).length > 0;
 
-  if (!hasIdentity || !hasFinish) {
+  if (!hasDetection && !hasFinish && !hasStamps) {
     report.ok = false;
     report.errors.push(
-      "No exported data. Ensure you have PROCESSED + LABELED images (processedFile set) before exporting."
+      "No data exported. Add PROCESSED + LABELED images with bbox annotations before training."
     );
   }
 

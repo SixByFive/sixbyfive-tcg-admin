@@ -279,14 +279,14 @@ export default function TrainPage() {
               <Card title="Run options" subtitle="Choose what to train, and whether to skip exports.">
                 <div className="vlMutedSmall">Train scope</div>
                 <div className="vlRow" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  {["all", "identity", "finish"].map((v) => (
+                  {["all", "detection", "finish", "stamps"].map((v) => (
                     <button
                       key={v}
                       type="button"
                       className={only === v ? "vlSegBtn active" : "vlSegBtn"}
                       onClick={() => setOnly(v)}
                     >
-                      {v === "all" ? "All" : v === "identity" ? "Identity" : "Finish"}
+                      {v === "all" ? "All" : v === "detection" ? "Detection" : v === "finish" ? "Finish" : "Stamps"}
                     </button>
                   ))}
                   <div style={{ width: 10 }} />

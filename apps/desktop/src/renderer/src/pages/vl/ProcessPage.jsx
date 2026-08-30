@@ -28,6 +28,12 @@ import React, {
   useState,
   memo,
 } from "react";
+
+const BBOX_CLASSES = [
+  { key: "card",         label: "Card",   color: "#3b82f6" },
+  { key: "nameRegion",   label: "Name",   color: "#22c55e" },
+  { key: "numberRegion", label: "Number", color: "#f97316" },
+];
 import { createPortal } from "react-dom";
 
 import Card from "./components/Card";
@@ -393,11 +399,18 @@ function SmartParse({ onApply, setsIndex }) {
     const raw = String(text || "").trim();
     if (!raw) return null;
     const tokens = raw.split(/\s+/).filter(Boolean);
-    let setCode = "", number = "", finish = "";
+    let setCode = "", number = "", total = "", finish = "";
     const stamps = [], nameParts = [];
     for (const t of tokens) {
       const lower = t.toLowerCase();
       if (!setCode) { const r = resolveSetAbbrev(lower, setsIndex); if (r) { setCode = r; continue; } }
+      // "52/193" or "1/102" — parse number and set total together
+      if (!number && /^\d{1,4}\/\d{1,4}$/.test(lower)) {
+        const [n, tot] = lower.split("/");
+        number = formatCardNumber3(n);
+        total = tot;
+        continue;
+      }
       if (!number && /^\d{1,4}$/i.test(lower)) { number = formatCardNumber3(lower); continue; }
       if (!finish && FINISHES.includes(lower)) { finish = lower; continue; }
       if (lower.startsWith("stamp:")) { const s = normalizeStampClient(lower.replace(/^stamp:/, "")); if (s) stamps.push(s); continue; }
@@ -405,7 +418,7 @@ function SmartParse({ onApply, setsIndex }) {
       nameParts.push(t);
     }
     return {
-      card: { setCode: setCode || undefined, number: number || undefined, name: nameParts.join(" ").trim() || undefined },
+      card: { setCode: setCode || undefined, number: number || undefined, total: total || undefined, name: nameParts.join(" ").trim() || undefined },
       finish: finish || undefined,
       stamps: stamps.length ? Array.from(new Set(stamps)).sort() : undefined,
     };
@@ -501,7 +514,7 @@ function StampPicker({ value, onChange }) {
    Zero re-renders while the user is typing.
    ===================================================== */
 
-function TextField({ activeId, value, onCommit, placeholder, inputMode, pattern }) {
+function TextField({ activeId, value, onCommit, placeholder, inputMode, pattern, style }) {
   const ref = useRef(null);
   const prevIdRef = useRef(null);
 
@@ -517,6 +530,7 @@ function TextField({ activeId, value, onCommit, placeholder, inputMode, pattern 
     <input
       ref={ref}
       className="vlInput"
+      style={style}
       defaultValue={value || ""}
       onBlur={(e) => onCommit(e.target.value)}
       onKeyDown={(e) => { if (e.key === "Enter") onCommit(e.target.value); }}
@@ -568,6 +582,9 @@ const ListItem = memo(function ListItem({ img, active, thumb, onClick, onVisible
             {isRawFile(img) ? <span className="vlBadge">Raw</span> : <span className="vlBadge">Other</span>}
             {isProcessed(img) ? <span className="vlBadge ok">Processed</span> : <span className="vlBadge">Unprocessed</span>}
             {isRowReady(img) ? <span className="vlBadge ok">Ready</span> : <span className="vlBadge">Missing</span>}
+            {img.bbox?.card && img.bbox?.nameRegion && img.bbox?.numberRegion
+              ? <span className="vlBadge ok">Bbox</span>
+              : null}
           </div>
         </div>
         <div className="vlMutedSmall vlProcItemSub">
@@ -579,6 +596,241 @@ const ListItem = memo(function ListItem({ img, active, thumb, onClick, onVisible
     </button>
   );
 });
+
+/* =====================================================
+   BboxEditor — canvas-based region annotator
+   ===================================================== */
+
+function BboxEditor({ activeId, activeImage, previewUrl, onBboxSaved }) {
+  const [activeTool, setActiveTool]   = useState("card");
+  const [bboxes, setBboxes]           = useState({ card: null, nameRegion: null, numberRegion: null });
+  const [saving, setSaving]           = useState(false);
+  const [bboxToast, setBboxToast]     = useState(null);
+
+  const imgRef     = useRef(null);
+  const canvasRef  = useRef(null);
+  const bboxesRef  = useRef(bboxes);
+  bboxesRef.current = bboxes;
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
+  const liveDrawRef = useRef(null);
+
+  // Sync committed boxes from manifest when image changes
+  useEffect(() => {
+    const b = activeImage?.bbox;
+    setBboxes({
+      card:         b?.card         ?? null,
+      nameRegion:   b?.nameRegion   ?? null,
+      numberRegion: b?.numberRegion ?? null,
+    });
+    liveDrawRef.current = null;
+    setBboxToast(null);
+  }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Draw the canvas (called imperatively — no React re-render per frame)
+  const drawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img    = imgRef.current;
+    if (!canvas || !img || !img.naturalWidth || !img.clientWidth) return;
+
+    // Sync canvas pixel buffer to displayed image size
+    canvas.width  = img.clientWidth;
+    canvas.height = img.clientHeight;
+
+    const ctx    = canvas.getContext("2d");
+    const scaleX = img.clientWidth  / img.naturalWidth;
+    const scaleY = img.clientHeight / img.naturalHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Committed boxes
+    for (const cls of BBOX_CLASSES) {
+      const box = bboxesRef.current[cls.key];
+      if (!box) continue;
+      const [ox, oy, ow, oh] = box;
+      const dx = ox * scaleX, dy = oy * scaleY, dw = ow * scaleX, dh = oh * scaleY;
+      ctx.save();
+      ctx.strokeStyle = cls.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(dx, dy, dw, dh);
+      ctx.font = "bold 11px system-ui, sans-serif";
+      const tw = ctx.measureText(cls.label).width + 8;
+      ctx.fillStyle = cls.color + "cc";
+      ctx.fillRect(dx, dy, tw, 18);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(cls.label, dx + 4, dy + 13);
+      ctx.restore();
+    }
+
+    // Live drag preview
+    const live = liveDrawRef.current;
+    if (live) {
+      const cls = BBOX_CLASSES.find((c) => c.key === activeToolRef.current);
+      const x = Math.min(live.startX, live.currentX);
+      const y = Math.min(live.startY, live.currentY);
+      const w = Math.abs(live.currentX - live.startX);
+      const h = Math.abs(live.currentY - live.startY);
+      ctx.save();
+      ctx.strokeStyle = cls?.color || "#fff";
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+    }
+  }, []);
+
+  // Redraw after committed state changes or image swap
+  useEffect(() => { drawCanvas(); }, [bboxes, previewUrl, drawCanvas]);
+
+  // Redraw on container resize (e.g. panel resize)
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const ro = new ResizeObserver(drawCanvas);
+    ro.observe(img);
+    return () => ro.disconnect();
+  }, [drawCanvas]);
+
+  function canvasCoords(e) {
+    const r = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    const { x, y } = canvasCoords(e);
+    liveDrawRef.current = { startX: x, startY: y, currentX: x, currentY: y };
+  }
+
+  function onMouseMove(e) {
+    if (!liveDrawRef.current) return;
+    const { x, y } = canvasCoords(e);
+    liveDrawRef.current = { ...liveDrawRef.current, currentX: x, currentY: y };
+    drawCanvas();
+  }
+
+  function onMouseUp(e) {
+    const live = liveDrawRef.current;
+    if (!live) return;
+    const { x, y } = canvasCoords(e);
+
+    const rawX = Math.min(live.startX, x);
+    const rawY = Math.min(live.startY, y);
+    const rawW = Math.abs(x - live.startX);
+    const rawH = Math.abs(y - live.startY);
+    liveDrawRef.current = null;
+
+    if (rawW < 5 || rawH < 5) { drawCanvas(); return; }
+
+    const img = imgRef.current;
+    if (!img || !img.clientWidth) return;
+    const sx = img.naturalWidth  / img.clientWidth;
+    const sy = img.naturalHeight / img.clientHeight;
+    const box = [
+      Math.round(rawX * sx), Math.round(rawY * sy),
+      Math.round(rawW * sx), Math.round(rawH * sy),
+    ];
+
+    const tool = activeToolRef.current;
+    setBboxes((prev) => ({ ...prev, [tool]: box }));
+
+    // Auto-advance tool after drawing
+    const idx = BBOX_CLASSES.findIndex((c) => c.key === tool);
+    setActiveTool(BBOX_CLASSES[(idx + 1) % BBOX_CLASSES.length].key);
+  }
+
+  async function saveBbox() {
+    if (!activeId) return;
+    setSaving(true);
+    setBboxToast(null);
+    try {
+      const res = await window.visionlab.updateImageMeta({ id: activeId, patch: { bbox: bboxes } });
+      if (!res?.ok) throw new Error(res?.error || "Save failed");
+      onBboxSaved?.(res.image);
+      setBboxToast({ kind: "ok", message: "Saved." });
+    } catch (err) {
+      setBboxToast({ kind: "error", message: String(err?.message || err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const allSet = !!(bboxes.card && bboxes.nameRegion && bboxes.numberRegion);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
+
+      {/* Tool selector */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
+        {BBOX_CLASSES.map((cls) => (
+          <button
+            key={cls.key}
+            type="button"
+            onClick={() => setActiveTool(cls.key)}
+            className={activeTool === cls.key ? "vlSegBtn active" : "vlSegBtn"}
+            style={activeTool === cls.key
+              ? { borderColor: cls.color, color: cls.color }
+              : bboxes[cls.key] ? { color: cls.color } : {}}
+          >
+            {bboxes[cls.key] ? "✓ " : ""}{cls.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="vlSegBtn"
+          onClick={() => {
+            setBboxes({ card: null, nameRegion: null, numberRegion: null });
+            liveDrawRef.current = null;
+            drawCanvas();
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* Image + canvas overlay */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {previewUrl ? (
+          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%" }}>
+            <img
+              ref={imgRef}
+              src={previewUrl}
+              alt=""
+              draggable={false}
+              style={{ display: "block", maxWidth: "100%", maxHeight: "100%", userSelect: "none" }}
+              onLoad={drawCanvas}
+            />
+            <canvas
+              ref={canvasRef}
+              style={{ position: "absolute", top: 0, left: 0, cursor: "crosshair" }}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={() => { liveDrawRef.current = null; drawCanvas(); }}
+            />
+          </div>
+        ) : (
+          <div className="vlProcBigSkeleton">Loading preview…</div>
+        )}
+      </div>
+
+      {/* Save row */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+        <Button onClick={saveBbox} disabled={saving || !allSet}>
+          {saving ? "Saving…" : "Save Bbox"}
+        </Button>
+        {bboxToast
+          ? <span style={{ fontSize: 11, color: bboxToast.kind === "ok" ? "#22c55e" : "#ef4444" }}>{bboxToast.message}</span>
+          : !allSet
+          ? <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Draw Card → Name → Number</span>
+          : <span style={{ fontSize: 11, color: "#22c55e" }}>✓ All regions set</span>
+        }
+      </div>
+
+    </div>
+  );
+}
 
 /* =====================================================
    Page
@@ -728,6 +980,7 @@ export default function ProcessPage() {
           setCode: resolvedSet || normalizeSetCode(img.card?.setCode ?? ""),
           number: formatCardNumber3(img.card?.number ?? ""),
           name: String(img.card?.name ?? ""),
+          total: String(img.card?.total ?? "").replace(/\D/g, ""),
         },
         finish: img.finish == null ? null : normalizeFinishClient(img.finish),
         stamps: Array.isArray(img.stamps) ? img.stamps.map(normalizeStampClient).filter(Boolean) : [],
@@ -783,6 +1036,7 @@ export default function ProcessPage() {
             setCode: img.card?.setCode ?? "",
             number: img.card?.number ?? "",
             name: img.card?.name ?? "",
+            total: String(img.card?.total ?? "").replace(/\D/g, ""),
           },
           finish: img.finish ?? null,
           stamps: Array.isArray(img.stamps) ? img.stamps : [],
@@ -976,6 +1230,7 @@ export default function ProcessPage() {
                         ...(parsed.card || {}),
                         setCode: normalizeSetCode(nextResolved),
                         number: formatCardNumber3(parsed?.card?.number ?? img.card?.number ?? ""),
+                        total: parsed?.card?.total ?? img.card?.total ?? "",
                       },
                       finish: parsed.finish ?? img.finish,
                       stamps: parsed.stamps ?? img.stamps,
@@ -1000,21 +1255,39 @@ export default function ProcessPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="vlLabel">Number</label>
-                  <TextField
-                    activeId={activeId}
-                    value={activeImage.card?.number || ""}
-                    onCommit={(raw) =>
-                      updateActiveField((img) => ({
-                        ...img,
-                        card: { ...(img.card || {}), number: formatCardNumber3(raw) },
-                      }))
-                    }
-                    placeholder="052"
-                    inputMode="numeric"
-                    pattern="\d*"
-                  />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 2 }}>
+                    <label className="vlLabel">Number</label>
+                    <TextField
+                      activeId={activeId}
+                      value={activeImage.card?.number || ""}
+                      onCommit={(raw) =>
+                        updateActiveField((img) => ({
+                          ...img,
+                          card: { ...(img.card || {}), number: formatCardNumber3(raw) },
+                        }))
+                      }
+                      placeholder="052"
+                      inputMode="numeric"
+                      pattern="\d*"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="vlLabel">Total</label>
+                    <TextField
+                      activeId={activeId}
+                      value={activeImage.card?.total || ""}
+                      onCommit={(raw) =>
+                        updateActiveField((img) => ({
+                          ...img,
+                          card: { ...(img.card || {}), total: String(raw).replace(/\D/g, "") },
+                        }))
+                      }
+                      placeholder="193"
+                      inputMode="numeric"
+                      pattern="\d*"
+                    />
+                  </div>
                 </div>
 
                 <div className="vlProcSpan2">
@@ -1084,15 +1357,18 @@ export default function ProcessPage() {
         </Card>
       </div>
 
-      {/* ── Right: preview ── */}
+      {/* ── Right: bbox annotator ── */}
       <div className="vlProcRight">
         <Card title={activeImage?.id || "Preview"} subtitle={activeImage?.file || ""}>
-          <div className="vlProcRightScroll">
-            <div className="vlProcBigWrap">
-              {previewUrl
-                ? <img className="vlProcBig" src={previewUrl} alt={activeImage?.id || "preview"} />
-                : <div className="vlProcBigSkeleton">Loading preview…</div>}
-            </div>
+          <div className="vlProcRightScroll" style={{ overflow: "hidden" }}>
+            <BboxEditor
+              activeId={activeId}
+              activeImage={activeImage}
+              previewUrl={previewUrl}
+              onBboxSaved={(updatedImg) =>
+                setImages((prev) => prev.map((x) => x.id === activeId ? updatedImg : x))
+              }
+            />
           </div>
         </Card>
       </div>

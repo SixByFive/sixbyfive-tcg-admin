@@ -60,6 +60,7 @@ const visionlabAPI = {
 
   listModels:    ()        => ipcRenderer.invoke('visionlab:listModels'),
   readModelFile: (payload) => ipcRenderer.invoke('visionlab:readModelFile', payload),
+  identify:      (payload) => ipcRenderer.invoke('visionlab:identify', payload),
 
   listTrainingRuns:     ()      => ipcRenderer.invoke('visionlab:listTrainingRuns'),
   getTrainingRunDetail: (runId) => ipcRenderer.invoke('visionlab:getTrainingRunDetail', runId),

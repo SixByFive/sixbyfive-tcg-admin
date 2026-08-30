@@ -41,7 +41,48 @@ function AccuracyBar({ label, value }) {
 }
 
 // =====================================================
-// Model overview card
+// Detection model card (YOLO)
+// =====================================================
+
+function DetectionOverview({ info }) {
+  if (!info?.exists) {
+    return (
+      <Card title="Detection" subtitle="Not trained yet">
+        <div className="vlMutedSmall">
+          No YOLO model found. Label bbox annotations and run training first.
+        </div>
+      </Card>
+    );
+  }
+
+  const cfg = info.config || {};
+  const labels = Array.isArray(info.labels) ? info.labels : [];
+
+  return (
+    <Card title="Detection" subtitle={`YOLO · ${info.numClasses || "?"} classes`}>
+      <div className="vlModelOverview">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {labels.map((l) => (
+            <span key={l} className="vlBadge ok" style={{ fontSize: 11 }}>{l}</span>
+          ))}
+        </div>
+        <div className="vlConfigGrid">
+          {cfg.model_name && <ConfigItem k="model" v={cfg.model_name} />}
+          {cfg.epochs    && <ConfigItem k="epochs" v={cfg.epochs} />}
+          {cfg.image_size && <ConfigItem k="input" v={`${cfg.image_size}px`} />}
+          {cfg.batch_size && <ConfigItem k="batch" v={cfg.batch_size} />}
+        </div>
+        <div className="vlMutedSmall" style={{ marginTop: 8, display: "flex", gap: 12 }}>
+          <span>✓ best.pt</span>
+          {info.hasOnnx && <span>✓ ONNX</span>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// =====================================================
+// Classifier model overview card
 // =====================================================
 
 function ModelOverview({ name, info }) {
@@ -130,8 +171,9 @@ function RunsTable({ runs }) {
         <tr>
           <th>Run</th>
           <th>Status</th>
-          <th>Identity</th>
+          <th>Detection</th>
           <th>Finish</th>
+          <th>Stamps</th>
           <th>Date</th>
         </tr>
       </thead>
@@ -145,8 +187,9 @@ function RunsTable({ runs }) {
 }
 
 function RunRow({ run }) {
-  const id = run.steps?.identity;
+  const det = run.steps?.detection;
   const fin = run.steps?.finish;
+  const stm = run.steps?.stamps;
 
   return (
     <tr>
@@ -156,12 +199,8 @@ function RunRow({ run }) {
         {run.ok ? "Success" : "Failed"}
       </td>
       <td>
-        {id?.evalTop1 != null ? (
-          <MetricCell value={id.evalTop1} label="top-1" />
-        ) : id?.valAccuracy != null ? (
-          <MetricCell value={id.valAccuracy} label="val" />
-        ) : id?.ok === false ? (
-          <span className="vlMutedSmall">—</span>
+        {det?.mAP50 != null ? (
+          <MetricCell value={det.mAP50} label="mAP50" />
         ) : (
           <span className="vlMutedSmall">—</span>
         )}
@@ -171,6 +210,15 @@ function RunRow({ run }) {
           <MetricCell value={fin.evalTop1} label="top-1" />
         ) : fin?.valAccuracy != null ? (
           <MetricCell value={fin.valAccuracy} label="val" />
+        ) : (
+          <span className="vlMutedSmall">—</span>
+        )}
+      </td>
+      <td>
+        {stm?.evalTop1 != null ? (
+          <MetricCell value={stm.evalTop1} label="top-1" />
+        ) : stm?.valAccuracy != null ? (
+          <MetricCell value={stm.valAccuracy} label="val" />
         ) : (
           <span className="vlMutedSmall">—</span>
         )}
@@ -226,15 +274,17 @@ export default function ResultsPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const identity = modelStatus?.identity;
-  const finish = modelStatus?.finish;
+  const detection = modelStatus?.detection;
+  const finish    = modelStatus?.finish;
+  const stamps    = modelStatus?.stamps;
 
   return (
     <div className="vlResultsPage">
       {/* Model overview */}
       <div className="vlModelCards">
-        <ModelOverview name="Identity" info={identity} />
+        <DetectionOverview info={detection} />
         <ModelOverview name="Finish" info={finish} />
+        <ModelOverview name="Stamps" info={stamps} />
       </div>
 
       {/* Run history */}

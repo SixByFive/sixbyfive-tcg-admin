@@ -306,9 +306,19 @@ export function MarketingPage(): JSX.Element {
                 )}
 
                 {ollamaError && (
-                  <div className="mt-3 flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{ollamaError}</span>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>{ollamaError}</span>
+                    </div>
+                    {models.length === 0 && (
+                      <button
+                        onClick={() => window.open('https://ollama.com/download')}
+                        className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Download Ollama
+                      </button>
+                    )}
                   </div>
                 )}
 

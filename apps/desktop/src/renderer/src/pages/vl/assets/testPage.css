@@ -317,6 +317,46 @@
 
 .vlTestClearBtn:hover { background: hsl(var(--card)); }
 
+/* Identity result grid */
+.vlTestIdentityGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vlTestIdentityRow {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.vlTestIdentityLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: hsl(var(--muted-foreground));
+}
+
+.vlTestIdentityValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* Set match row */
+.vlTestSetMatch {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--primary) / 0.25);
+  background: hsl(var(--primary) / 0.05);
+  font-size: 13px;
+}
+
 /* Empty state */
 .vlTestEmpty {
   display: flex;

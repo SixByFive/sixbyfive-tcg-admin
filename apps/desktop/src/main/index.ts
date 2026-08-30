@@ -53,6 +53,7 @@ import {
 import { ensureWorkspaceOnStartup, getWorkspacePath } from './vl/services/workspace.service.js'
 import { startWorkspaceWatcher } from './vl/services/workspaceWatcher.service.js'
 import { flushManifest } from './vl/services/manifest.service.js'
+import { stopInferenceServer } from './vl/services/inference.service.js'
 
 // electron-builder only bakes resources/icon.ico into packaged builds —
 // BrowserWindow needs it set explicitly so the taskbar/title bar icon
@@ -195,6 +196,7 @@ app.on('before-quit', (e) => {
   e.preventDefault()
   ;(async () => {
     try {
+      stopInferenceServer()
       const wp = getWorkspacePath()
       await flushManifest(wp)
     } catch {

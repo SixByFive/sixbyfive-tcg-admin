@@ -46,15 +46,16 @@ function openSsh(settings: any): Promise<Client> {
   })
 }
 
-function exec(conn: Client, command: string): Promise<{ code: number; stdout: string; stderr: string }> {
+function exec(conn: Client, command: string, timeoutMs = 30_000): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`SSH command timed out after ${timeoutMs / 1000}s`)), timeoutMs)
     conn.exec(command, (error, stream) => {
-      if (error) return reject(error)
+      if (error) { clearTimeout(timer); return reject(error) }
       let stdout = ''
       let stderr = ''
       stream.on('data', data => { stdout += data.toString('utf8') })
       stream.stderr.on('data', data => { stderr += data.toString('utf8') })
-      stream.on('close', code => resolve({ code: code ?? 0, stdout, stderr }))
+      stream.on('close', code => { clearTimeout(timer); resolve({ code: code ?? 0, stdout, stderr }) })
     })
   })
 }
@@ -142,7 +143,7 @@ async function setupVideoNode(): Promise<{ ok: boolean; message: string }> {
     ].join(' && ')
 
     emit('marketing:video:status', { status: 'running', message: 'Setting up ComfyUI on Heimdall…' })
-    const result = await exec(conn, command)
+    const result = await exec(conn, command, 600_000) // 10 min — git clone + pip install
     if (result.code !== 0) {
       return { ok: false, message: result.stderr || result.stdout || `Setup exited with code ${result.code}` }
     }

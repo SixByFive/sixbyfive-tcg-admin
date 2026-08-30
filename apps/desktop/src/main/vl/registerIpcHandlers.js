@@ -44,6 +44,7 @@ import {
 } from "./handlers/train.handlers.js";
 
 import { listModels, readModelFile } from "./handlers/model.handlers.js";
+import { identifyCard } from "./handlers/inference.handlers.js";
 
 import {
   listTrainingRuns,
@@ -101,6 +102,9 @@ export function registerIpcHandlers() {
   // ── TFJS inference (Test page) ─────────────────────────────────────────────
   ipcMain.handle("visionlab:listModels",    listModels);
   ipcMain.handle("visionlab:readModelFile", readModelFile);
+
+  // ── Python YOLO+OCR inference ──────────────────────────────────────────────
+  ipcMain.handle("visionlab:identify", identifyCard);
 
   // ── Results ────────────────────────────────────────────────────────────────
   ipcMain.handle("visionlab:listTrainingRuns",    listTrainingRuns);

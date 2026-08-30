@@ -61,7 +61,7 @@ export async function listTrainingRuns() {
 function summarizeSteps(steps) {
   const summary = {};
 
-  for (const key of ["train_identity", "train_finish"]) {
+  for (const key of ["train_detection", "train_finish", "train_stamps"]) {
     const s = steps[key];
     if (!s) continue;
     const name = key.replace("train_", "");
@@ -71,11 +71,14 @@ function summarizeSteps(steps) {
       valAccuracy: s.val_accuracy || null,
       valTop3: s.val_top3 || null,
       valTop5: s.val_top5 || null,
+      // YOLO metrics
+      mAP50: s.mAP50 || null,
+      mAP50_95: s.mAP50_95 || null,
       warnings: (s.warnings || []).length,
     };
   }
 
-  for (const key of ["eval_identity", "eval_finish"]) {
+  for (const key of ["eval_finish", "eval_stamps"]) {
     const s = steps[key];
     if (!s) continue;
     const name = key.replace("eval_", "");
@@ -109,7 +112,7 @@ export async function getTrainingRunDetail(_event, runId) {
 
     const detail = { ok: true, report, metrics: {}, history: {} };
 
-    for (const classifier of ["identity", "finish"]) {
+    for (const classifier of ["finish", "stamps"]) {
       const metricsPath = path.join(reportsDir, classifier, runId, "metrics.json");
       if (fs.existsSync(metricsPath)) {
         try { detail.metrics[classifier] = JSON.parse(fs.readFileSync(metricsPath, "utf-8")); } catch {}
@@ -142,7 +145,7 @@ export async function getModelStatus() {
   const modelsDir = path.join(ws, "models");
   const status = {};
 
-  for (const classifier of ["identity", "finish"]) {
+  for (const classifier of ["finish", "stamps"]) {
     const dir = path.join(modelsDir, classifier);
     const info = { exists: false };
 
@@ -175,6 +178,27 @@ export async function getModelStatus() {
 
     status[classifier] = info;
   }
+
+  // Detection model (YOLO — different path structure)
+  const detWeightsDir = path.join(modelsDir, "detection", "detection", "weights");
+  const detInfo = { exists: false, type: "yolo" };
+  if (fs.existsSync(detWeightsDir)) {
+    detInfo.exists = fs.existsSync(path.join(detWeightsDir, "best.pt"));
+    detInfo.hasOnnx = fs.existsSync(path.join(detWeightsDir, "best.onnx"));
+    const labelsPath = path.join(detWeightsDir, "labels.json");
+    if (fs.existsSync(labelsPath)) {
+      try {
+        const labels = JSON.parse(fs.readFileSync(labelsPath, "utf-8"));
+        detInfo.labels = labels;
+        detInfo.numClasses = Array.isArray(labels) ? labels.length : 0;
+      } catch {}
+    }
+    const configPath = path.join(detWeightsDir, "model_config.json");
+    if (fs.existsSync(configPath)) {
+      try { detInfo.config = JSON.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
+    }
+  }
+  status.detection = detInfo;
 
   return { ok: true, status };
 }

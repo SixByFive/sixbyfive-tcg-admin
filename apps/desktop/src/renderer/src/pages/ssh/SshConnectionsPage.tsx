@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Terminal, Key, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,17 +24,25 @@ const api = (window as any).ssh as {
   deleteConnection: (args: { id: string }) => Promise<{ ok: boolean }>
 }
 
+interface VaultEntry { id: string; name: string; username: string; hasPassword: boolean }
+
 export function SshConnectionsPage(): JSX.Element {
   const [connections, setConnections] = useState<SavedConnection[]>([])
   const [editing, setEditing]         = useState<Partial<SavedConnection> | null>(null)
   const [saving, setSaving]           = useState(false)
   const [deleteId, setDeleteId]       = useState<string | null>(null)
+  const [vaultEntries, setVaultEntries] = useState<VaultEntry[]>([])
 
-  async function load() {
+  const load = useCallback(async () => {
     setConnections(await api.listConnections())
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    ;(window as any).vault.list().then((entries: VaultEntry[]) =>
+      setVaultEntries((entries ?? []).filter(e => e.hasPassword))
+    ).catch(() => {})
+  }, [])
 
   async function handleSave() {
     if (!editing) return
@@ -194,14 +202,23 @@ export function SshConnectionsPage(): JSX.Element {
                 </div>
               ) : (
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-muted-foreground">Vault entry ID</label>
-                  <input
-                    value={editing.vaultId ?? ''}
-                    onChange={e => setEditing(d => ({ ...d!, vaultId: e.target.value }))}
-                    placeholder="Paste the UUID from your Vault entry"
-                    className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <p className="text-[10px] text-muted-foreground">Save the SSH password in Vault first, then copy its ID here.</p>
+                  <label className="text-xs font-medium text-muted-foreground">Vault entry</label>
+                  {vaultEntries.length > 0 ? (
+                    <select
+                      value={editing.vaultId ?? ''}
+                      onChange={e => setEditing(d => ({ ...d!, vaultId: e.target.value }))}
+                      className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">Select a vault entry…</option>
+                      {vaultEntries.map(e => (
+                        <option key={e.id} value={e.id}>{e.name}{e.username ? ` (${e.username})` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                      No vault entries with passwords found. Add one in the Vault section first.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
