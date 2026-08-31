@@ -22,3 +22,5 @@ matplotlib>=3.8
 pyyaml>=6.0
 tensorboard>=2.16
 setuptools==69.5.1
+ultralytics
+easyocr
