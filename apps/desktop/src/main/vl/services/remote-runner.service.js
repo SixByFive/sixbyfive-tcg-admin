@@ -113,10 +113,13 @@ export async function bootstrapHeimdall({ force = false } = {}) {
       `if [ -d "${heimdallRepoDir}/.git" ]; then`
       + ` echo "Repo exists — pulling latest from ${heimdallRepoBranch}…";`
       + ` git -C "${heimdallRepoDir}" pull origin ${heimdallRepoBranch};`
-      + ` else echo "Cloning ${heimdallRepoUrl}…";`
-      + ` git clone --branch ${heimdallRepoBranch} "${heimdallRepoUrl}" "${heimdallRepoDir}";`
+      + ` else echo "Sparse-cloning ${heimdallRepoUrl} (vision-trainer only)…";`
+      + ` git clone --no-checkout --depth 1 --branch ${heimdallRepoBranch} "${heimdallRepoUrl}" "${heimdallRepoDir}"`
+      + ` && git -C "${heimdallRepoDir}" sparse-checkout init --cone`
+      + ` && git -C "${heimdallRepoDir}" sparse-checkout set vision-trainer`
+      + ` && git -C "${heimdallRepoDir}" checkout;`
       + ` fi`,
-      "Setting up repo (git clone / pull)…",
+      "Setting up repo (sparse clone / pull)…",
     ],
     [
       `if [ -d "${trainerDir}/.venv" ]; then`
@@ -241,12 +244,12 @@ export async function startRemoteTrainingJob() {
       catch (err) { logStream.end(); return { ok: false, error: `SSH reconnect failed: ${err.message}` }; }
     }
 
-    // Export training datasets from manifest into identity_raw / finish_raw before training
+    // Export training datasets from manifest into detection_raw / finish_raw / stamps_raw before training
     log(`=== Exporting training datasets from manifest…\n`);
     emit("training:remote-status", { jobId, status: "running", message: "Exporting training datasets…" });
     try {
       const exportResult = await exportTrainingDatasets(localWorkspace, { clean: true, prefer: "copy" });
-      log(`[export] ok=${exportResult.ok} identity=${exportResult.counts?.identityFiles ?? 0} finish=${exportResult.counts?.finishFiles ?? 0}\n`);
+      log(`[export] ok=${exportResult.ok} detection=${exportResult.counts?.detectionFiles ?? 0} finish=${exportResult.counts?.finishFiles ?? 0} stamps=${exportResult.counts?.stampFiles ?? 0}\n`);
       if (!exportResult.ok) {
         logStream.end(); conn.end();
         return { ok: false, error: `Dataset export failed: ${exportResult.errors?.join(", ") || "unknown error"}` };
