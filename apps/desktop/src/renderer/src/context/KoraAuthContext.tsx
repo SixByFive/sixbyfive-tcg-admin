@@ -65,7 +65,7 @@ export function KoraAuthProvider({ children }: { children: ReactNode }): JSX.Ele
     const scan = async (): Promise<void> => {
       try {
         const entries: Array<{ id: string; name: string; username: string }> = await vaultAPI.list()
-        const entry = entries?.find(e => e.name === 'Kora Service Account')
+        const entry = entries?.find(e => e.name === 'Kora Service Account' || e.name === 'Kora')
         if (entry) { vaultId = entry.id; email = email || entry.username; saveKoraServiceAccount(email!, vaultId) }
       } catch { /* vault not ready */ }
     }

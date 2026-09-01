@@ -19,7 +19,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { app } from "electron";
 
-import { readSettings, writeSettings } from "./settings.service.js";
+import { readSettings, writeSettings, getEffectiveWorkspacePath } from "./settings.service.js";
 import {
   getManifestPath,
   createEmptyManifest,
@@ -136,14 +136,16 @@ export function ensureWorkspaceOnStartup() {
   if (_cachedWorkspacePath) return _cachedWorkspacePath;
 
   const settings = readSettings();
+  const mode = settings.deploymentMode || "local";
 
-  let workspacePath = settings.workspacePath || null;
-  if (!workspacePath) workspacePath = getDefaultWorkspacePath();
+  let workspacePath = getEffectiveWorkspacePath() || getDefaultWorkspacePath();
 
   fs.mkdirSync(workspacePath, { recursive: true });
   ensureWorkspaceStructure(workspacePath);
 
-  if (settings.workspacePath !== workspacePath) {
+  // Only persist back to workspacePath when in local mode so the fenrir
+  // path is never clobbered by the local default.
+  if (mode === "local" && settings.workspacePath !== workspacePath) {
     writeSettings({ ...settings, workspacePath });
   }
 

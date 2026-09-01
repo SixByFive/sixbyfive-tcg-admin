@@ -1,13 +1,12 @@
 // FILE: apps/desktop/src/main/vl/handlers/inference.handlers.js
 
-import { readSettings } from "../services/settings.service.js";
+import { getEffectiveWorkspacePath } from "../services/settings.service.js";
 import { identify } from "../services/inference.service.js";
 
 export async function identifyCard(_, { imageDataUrl } = {}) {
   if (!imageDataUrl) return { ok: false, error: "No image data provided." };
 
-  const settings = readSettings();
-  const workspacePath = settings.workspacePath;
+  const workspacePath = getEffectiveWorkspacePath();
   if (!workspacePath) return { ok: false, error: "No workspace selected." };
 
   try {

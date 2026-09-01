@@ -3,7 +3,7 @@
 import path from "node:path";
 import { app } from "electron";
 import { BrowserWindow } from "electron";
-import { readSettings } from "../services/settings.service.js";
+import { readSettings, getEffectiveWorkspacePath } from "../services/settings.service.js";
 import { exportTrainingDatasets } from "../services/exportTrainingDatasets.service.js";
 import {
   startRemoteTrainingJob,
@@ -50,11 +50,7 @@ export async function startTraining(_, args = {}) {
       return { ok: false, error: "Training already running." };
     }
 
-    const workspacePath =
-      mode === "fenrir"
-        ? settings.fenrirWorkspacePath || settings.workspacePath
-        : settings.workspacePath;
-
+    const workspacePath = getEffectiveWorkspacePath();
     if (!workspacePath) {
       return { ok: false, error: "No workspace selected." };
     }

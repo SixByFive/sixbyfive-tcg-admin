@@ -8,18 +8,13 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { readSettings } from "../services/settings.service.js";
-
-function getWorkspacePath() {
-  const settings = readSettings();
-  return settings?.workspacePath || null;
-}
+import { getEffectiveWorkspacePath } from "../services/settings.service.js";
 
 /**
  * List all training runs, sorted newest first.
  */
 export async function listTrainingRuns() {
-  const ws = getWorkspacePath();
+  const ws = getEffectiveWorkspacePath();
   if (!ws) return { ok: false, error: "No workspace selected" };
 
   const reportsDir = path.join(ws, "reports");
@@ -96,7 +91,7 @@ function summarizeSteps(steps) {
  * Get detailed results for a specific training run.
  */
 export async function getTrainingRunDetail(_event, runId) {
-  const ws = getWorkspacePath();
+  const ws = getEffectiveWorkspacePath();
   if (!ws) return { ok: false, error: "No workspace selected" };
 
   const reportsDir = path.join(ws, "reports");
@@ -139,7 +134,7 @@ export async function getTrainingRunDetail(_event, runId) {
  * Get current model status (config, labels, accuracy, file existence).
  */
 export async function getModelStatus() {
-  const ws = getWorkspacePath();
+  const ws = getEffectiveWorkspacePath();
   if (!ws) return { ok: false, error: "No workspace selected" };
 
   const modelsDir = path.join(ws, "models");

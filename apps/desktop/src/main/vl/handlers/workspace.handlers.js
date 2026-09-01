@@ -15,6 +15,7 @@ import {
 import {
   readSettings,
   writeSettings,
+  getEffectiveWorkspacePath,
 } from "../services/settings.service.js";
 
 import { shellOpenFolder } from "../services/preview.service.js";
@@ -53,8 +54,7 @@ export async function selectWorkspace() {
 }
 
 export async function openWorkspace() {
-  const settings = readSettings();
-  const workspacePath = settings.workspacePath || null;
+  const workspacePath = getEffectiveWorkspacePath();
   if (!workspacePath) return { ok: false, error: "No workspace selected." };
 
   try {

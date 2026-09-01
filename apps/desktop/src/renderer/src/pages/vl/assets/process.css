@@ -3,45 +3,48 @@
 /* ---- LIST ITEM LAYOUT ---- */
 .vlProcItem {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
 
   width: 100%;
   text-align: left;
-  padding: 10px;
+  padding: 8px 12px 8px 10px;
   border-radius: 0.625rem;
   border: 1px solid hsl(var(--border));
+  border-left: 3px solid transparent;
   background: hsl(var(--muted));
   cursor: pointer;
   color: hsl(var(--foreground));
-  min-height: 96px;
-  transition: border-color 80ms ease, background 80ms ease;
+  min-height: 76px;
+  transition: border-color 80ms ease, background 80ms ease, box-shadow 80ms ease;
 }
 
 .vlProcItem:hover {
-  border-color: hsl(var(--ring) / 0.4);
+  border-color: hsl(var(--ring) / 0.35);
+  border-left-color: hsl(var(--ring) / 0.35);
   background: hsl(var(--accent));
 }
 
 .vlProcItem.active {
-  outline: 2px solid hsl(var(--primary) / 0.5);
-  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.08);
+  border-color: hsl(var(--border));
+  border-left-color: hsl(var(--primary));
   background: hsl(var(--primary) / 0.06);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.15);
 }
 
 /* Thumbnail cell */
 .vlProcThumbWrap {
-  width: 78px;
-  height: 96px;
+  width: 56px;
+  height: 72px;
   flex: 0 0 auto;
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--background));
   overflow: hidden;
   display: grid;
   place-items: center;
-  padding: 4px;
+  padding: 3px;
 }
 
 .vlProcThumb {
@@ -49,66 +52,76 @@
   height: 100%;
   object-fit: contain;
   background: hsl(var(--background));
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   display: block;
 }
 
 /* Meta column */
 .vlProcItemMeta {
   min-width: 0;
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.vlProcItemTitle {
+.vlProcItemPrimary {
   font-weight: 700;
   font-size: 13px;
-  letter-spacing: 0.2px;
+  color: hsl(var(--foreground));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: hsl(var(--foreground));
+  letter-spacing: 0.1px;
 }
 
-.vlProcItemSub {
+.vlProcItemFinish {
+  font-size: 11px;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-transform: capitalize;
 }
 
 .vlProcItemFile {
-  font-size: 12px;
+  font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: hsl(var(--foreground) / 0.85);
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  padding: 3px 7px;
-  border-radius: 0.375rem;
-  white-space: normal;
+  color: hsl(var(--muted-foreground) / 0.65);
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  margin-top: 1px;
 }
 
-/* Badges column */
-.vlProcBadges {
-  display: grid;
-  gap: 8px;
-  justify-items: end;
-  align-content: center;
-  padding-left: 8px;
-}
-
-.vlProcBadgesRow {
+/* Badges column — semantic pills stacked vertically */
+.vlProcItemBadges {
   display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
+.vlPill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  line-height: 1.4;
+  letter-spacing: 0.25px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+/* default: dim/neutral */
+.vlPill         { color: hsl(var(--muted-foreground) / 0.55); border-color: hsl(var(--border) / 0.6); }
+.vlPill.raw     { color: #60a5fa; border-color: rgba(96,165,250,.25); background: rgba(96,165,250,.08); }
+.vlPill.other   { color: hsl(var(--muted-foreground) / 0.55); border-color: hsl(var(--border) / 0.6); }
+.vlPill.ok      { color: #34d399; border-color: rgba(52,211,153,.25); background: rgba(52,211,153,.08); }
+.vlPill.warn    { color: #fb923c; border-color: rgba(251,146,60,.25);  background: rgba(251,146,60,.08); }
+.vlPill.bbox    { color: #a78bfa; border-color: rgba(167,139,250,.25); background: rgba(167,139,250,.08); }
+
+/* Legacy badge classes (used in other parts of the page) */
 .vlBadge {
   font-size: 11px;
   padding: 4px 8px;

@@ -133,9 +133,21 @@ export function readJson(p) {
 export function atomicWriteJson(p, data) {
   const dir = path.dirname(p);
   fs.mkdirSync(dir, { recursive: true });
+  const serialised = JSON.stringify(data, null, 2);
   const tmp = path.join(dir, `.tmp.${path.basename(p)}.${process.pid}.${Date.now()}`);
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
-  fs.renameSync(tmp, p);
+  fs.writeFileSync(tmp, serialised, "utf8");
+  try {
+    fs.renameSync(tmp, p);
+  } catch (err) {
+    // SMB shares return EPERM instead of EXDEV for cross-device renames.
+    // Fall back to direct overwrite and clean up the temp file.
+    if (err.code === "EPERM" || err.code === "EXDEV") {
+      try { fs.unlinkSync(tmp); } catch {}
+      fs.writeFileSync(p, serialised, "utf8");
+    } else {
+      throw err;
+    }
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -145,9 +157,21 @@ export function atomicWriteJson(p, data) {
 async function atomicWriteJsonAsync(p, data) {
   const dir = path.dirname(p);
   await fs.promises.mkdir(dir, { recursive: true });
+  const serialised = JSON.stringify(data, null, 2);
   const tmp = path.join(dir, `.tmp.${path.basename(p)}.${process.pid}.${Date.now()}`);
-  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await fs.promises.rename(tmp, p);
+  await fs.promises.writeFile(tmp, serialised, "utf8");
+  try {
+    await fs.promises.rename(tmp, p);
+  } catch (err) {
+    // SMB shares return EPERM instead of EXDEV for cross-device renames.
+    // Fall back to direct overwrite and clean up the temp file.
+    if (err.code === "EPERM" || err.code === "EXDEV") {
+      try { await fs.promises.unlink(tmp); } catch {}
+      await fs.promises.writeFile(p, serialised, "utf8");
+    } else {
+      throw err;
+    }
+  }
 }
 
 /* ─────────────────────────────────────────────

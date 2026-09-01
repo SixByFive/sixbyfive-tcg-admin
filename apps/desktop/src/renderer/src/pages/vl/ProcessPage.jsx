@@ -576,22 +576,19 @@ const ListItem = memo(function ListItem({ img, active, thumb, onClick, onVisible
         {thumb ? <img className="vlProcThumb" src={thumb} alt={img.id} /> : <div className="vlProcThumbSkeleton" />}
       </div>
       <div className="vlProcItemMeta">
-        <div className="vlProcItemTopRow">
-          <div className="vlProcItemTitle">{img.id}</div>
-          <div className="vlRow" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {isRawFile(img) ? <span className="vlBadge">Raw</span> : <span className="vlBadge">Other</span>}
-            {isProcessed(img) ? <span className="vlBadge ok">Processed</span> : <span className="vlBadge">Unprocessed</span>}
-            {isRowReady(img) ? <span className="vlBadge ok">Ready</span> : <span className="vlBadge">Missing</span>}
-            {img.bbox?.card && img.bbox?.nameRegion && img.bbox?.numberRegion
-              ? <span className="vlBadge ok">Bbox</span>
-              : null}
-          </div>
-        </div>
-        <div className="vlMutedSmall vlProcItemSub">
+        <div className="vlProcItemPrimary">
           {(img.card?.setCode || "—") + " · " + (img.card?.number || "—")}
-          {img.finish ? ` · ${img.finish}` : ""}
         </div>
+        {img.finish && <div className="vlProcItemFinish">{img.finish}</div>}
         <div className="vlProcItemFile">{img.file || "—"}</div>
+      </div>
+      <div className="vlProcItemBadges">
+        {isRawFile(img) ? <span className="vlPill raw">Raw</span> : <span className="vlPill other">Other</span>}
+        {isProcessed(img) ? <span className="vlPill ok">Processed</span> : <span className="vlPill">Unprocessed</span>}
+        {isRowReady(img) ? <span className="vlPill ok">Ready</span> : <span className="vlPill warn">Missing</span>}
+        {img.bbox?.card && img.bbox?.nameRegion && img.bbox?.numberRegion
+          ? <span className="vlPill bbox">Bbox</span>
+          : null}
       </div>
     </button>
   );
@@ -1359,8 +1356,8 @@ export default function ProcessPage() {
 
       {/* ── Right: bbox annotator ── */}
       <div className="vlProcRight">
-        <Card title={activeImage?.id || "Preview"} subtitle={activeImage?.file || ""}>
-          <div className="vlProcRightScroll" style={{ overflow: "hidden" }}>
+        <Card title={activeImage?.id || "Preview"} subtitle={activeImage?.file || ""} className="vlProcRightCard">
+          <div className="vlProcRightScroll">
             <BboxEditor
               activeId={activeId}
               activeImage={activeImage}
