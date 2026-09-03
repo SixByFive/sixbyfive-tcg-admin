@@ -79,6 +79,20 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('ready-to-show', () => { mainWindow.show() })
 
+  // Force permissive CORS headers on Kora API responses so Chromium never
+  // blocks them regardless of origin (file:// in production, localhost in dev).
+  mainWindow.webContents.session.webRequest.onHeadersReceived(
+    { urls: ['https://api.koraplatform.co.uk/*'] },
+    (details, callback) => {
+      const headers = { ...details.responseHeaders }
+      headers['access-control-allow-origin'] = ['*']
+      headers['access-control-allow-methods'] = ['GET, POST, PUT, PATCH, DELETE, OPTIONS']
+      headers['access-control-allow-headers'] = ['Content-Type, Authorization, x-admin-key']
+      headers['access-control-allow-credentials'] = ['true']
+      callback({ responseHeaders: headers })
+    }
+  )
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
