@@ -35,7 +35,14 @@ function buildDefaults() {
 function loadTargets() {
   try {
     if (!fs.existsSync(TARGETS_FILE)) return buildDefaults()
-    return JSON.parse(fs.readFileSync(TARGETS_FILE, 'utf-8'))
+    const targets = JSON.parse(fs.readFileSync(TARGETS_FILE, 'utf-8'))
+    // Heal any entries that were saved with a blank id by the old bug
+    let dirty = false
+    for (const t of targets) {
+      if (!t.id) { t.id = crypto.randomUUID(); dirty = true }
+    }
+    if (dirty) persist(targets)
+    return targets
   } catch {
     return buildDefaults()
   }
@@ -52,10 +59,16 @@ export function getTargets() {
 
 export function saveTarget(target) {
   const targets = loadTargets()
-  const idx = targets.findIndex(t => t.id === target.id)
-  const entry = { ...target, id: target.id ?? crypto.randomUUID() }
-  if (idx >= 0) targets[idx] = entry
-  else targets.push(entry)
+  const entry = { ...target, id: target.id || crypto.randomUUID() }
+  if (target.id) {
+    // Edit: replace the existing entry
+    const idx = targets.findIndex(t => t.id === target.id)
+    if (idx >= 0) targets[idx] = entry
+    else targets.push(entry)
+  } else {
+    // New target: always append (blank id cannot match an existing entry)
+    targets.push(entry)
+  }
   persist(targets)
   return { ok: true }
 }
