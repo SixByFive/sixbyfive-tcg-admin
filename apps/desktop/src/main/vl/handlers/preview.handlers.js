@@ -60,10 +60,13 @@ export function setCachedManifest(workspacePath, manifest) {
    share is only hit once per image per session.
    ───────────────────────────────────────────── */
 
-const THUMB_CACHE_MAX = 500;
-const THUMB_WIDTH = 160; // px — enough for the list column thumbnail
+const THUMB_CACHE_MAX   = 500;
+const THUMB_WIDTH       = 160;  // px — list column thumbnails
+const PREVIEW_WIDTH     = 900;  // px — annotation panel (much faster than full-res)
+const PREVIEW_CACHE_MAX = 100;
 
-const _thumbCache = new Map(); // id → base64 string
+const _thumbCache   = new Map(); // id → base64 string
+const _previewCache = new Map(); // id → base64 string
 
 function getThumbFromCache(id) {
   if (!_thumbCache.has(id)) return null;
@@ -146,6 +149,7 @@ export async function getThumbnailDataUrl(_evt, payload) {
 
       try {
         const buf = await sharp(abs)
+          .rotate()
           .resize(THUMB_WIDTH, null, {
             fit: "inside",
             withoutEnlargement: true,
@@ -169,6 +173,85 @@ export async function getThumbnailDataUrl(_evt, payload) {
         : { ok: false, error: "Thumbnail generation failed" };
     } finally {
       _thumbInFlight.delete(id);
+    }
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+}
+
+function getPreviewFromCache(id) {
+  if (!_previewCache.has(id)) return null;
+  const v = _previewCache.get(id);
+  _previewCache.delete(id);
+  _previewCache.set(id, v);
+  return v;
+}
+
+function setPreviewInCache(id, b64) {
+  if (_previewCache.has(id)) _previewCache.delete(id);
+  _previewCache.set(id, b64);
+  if (_previewCache.size > PREVIEW_CACHE_MAX) {
+    const oldest = _previewCache.keys().next().value;
+    _previewCache.delete(oldest);
+  }
+}
+
+export function invalidatePreviewCache(id) {
+  if (id) _previewCache.delete(id);
+  else _previewCache.clear();
+}
+
+const _previewInFlight = new Map();
+
+/* ─────────────────────────────────────────────
+   Handler: getPreviewDataUrl
+   Returns a ~900px JPEG for the annotation panel.
+   Much faster than full-res from a network share.
+   ───────────────────────────────────────────── */
+
+export async function getPreviewDataUrl(_evt, payload) {
+  try {
+    const workspacePath = ensureWorkspaceOnStartup();
+    const id = String(payload?.id || "").trim();
+    if (!id) return { ok: false, error: "Missing id" };
+
+    const cached = getPreviewFromCache(id);
+    if (cached) return { ok: true, dataUrl: `data:image/jpeg;base64,${cached.b64}`, origWidth: cached.origWidth, origHeight: cached.origHeight };
+
+    if (_previewInFlight.has(id)) {
+      const entry = await _previewInFlight.get(id);
+      return entry
+        ? { ok: true, dataUrl: `data:image/jpeg;base64,${entry.b64}`, origWidth: entry.origWidth, origHeight: entry.origHeight }
+        : { ok: false, error: "Preview generation failed" };
+    }
+
+    const work = (async () => {
+      const { abs, error } = resolveImageAbs(workspacePath, id);
+      if (error) return null;
+      try {
+        const pipeline = sharp(abs).rotate();
+        const meta = await pipeline.metadata();
+        const buf = await pipeline
+          .resize(PREVIEW_WIDTH, null, { fit: "inside", withoutEnlargement: true })
+          .jpeg({ quality: 88, mozjpeg: false })
+          .toBuffer();
+        const b64 = buf.toString("base64");
+        const entry = { b64, origWidth: meta.width, origHeight: meta.height };
+        setPreviewInCache(id, entry);
+        return entry;
+      } catch {
+        return null;
+      }
+    })();
+
+    _previewInFlight.set(id, work);
+    try {
+      const entry = await work;
+      return entry
+        ? { ok: true, dataUrl: `data:image/jpeg;base64,${entry.b64}`, origWidth: entry.origWidth, origHeight: entry.origHeight }
+        : { ok: false, error: "Preview generation failed" };
+    } finally {
+      _previewInFlight.delete(id);
     }
   } catch (err) {
     return { ok: false, error: String(err?.message || err) };

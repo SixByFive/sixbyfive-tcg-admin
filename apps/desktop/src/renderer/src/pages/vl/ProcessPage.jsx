@@ -577,18 +577,22 @@ const ListItem = memo(function ListItem({ img, active, thumb, onClick, onVisible
       </div>
       <div className="vlProcItemMeta">
         <div className="vlProcItemPrimary">
-          {(img.card?.setCode || "—") + " · " + (img.card?.number || "—")}
+          {img.card?.setCode && img.card?.number
+            ? img.card.setCode + " · " + img.card.number
+            : (img.file ? img.file.replace(/^(?:raw|processed)\//, "") : img.id)}
         </div>
         {img.finish && <div className="vlProcItemFinish">{img.finish}</div>}
-        <div className="vlProcItemFile">{img.file || "—"}</div>
       </div>
       <div className="vlProcItemBadges">
-        {isRawFile(img) ? <span className="vlPill raw">Raw</span> : <span className="vlPill other">Other</span>}
-        {isProcessed(img) ? <span className="vlPill ok">Processed</span> : <span className="vlPill">Unprocessed</span>}
-        {isRowReady(img) ? <span className="vlPill ok">Ready</span> : <span className="vlPill warn">Missing</span>}
+        {isProcessed(img)
+          ? <span className="vlPill ok">Processed</span>
+          : <span className="vlPill dim">Unprocessed</span>}
+        {isRowReady(img)
+          ? <span className="vlPill ok">Ready</span>
+          : <span className="vlPill dim">Missing</span>}
         {img.bbox?.card && img.bbox?.nameRegion && img.bbox?.numberRegion
-          ? <span className="vlPill bbox">Bbox</span>
-          : null}
+          ? <span className="vlPill bbox">Bbox ✓</span>
+          : <span className="vlPill dim">No bbox</span>}
       </div>
     </button>
   );
@@ -598,19 +602,21 @@ const ListItem = memo(function ListItem({ img, active, thumb, onClick, onVisible
    BboxEditor — canvas-based region annotator
    ===================================================== */
 
-function BboxEditor({ activeId, activeImage, previewUrl, onBboxSaved }) {
+function BboxEditor({ activeId, activeImage, previewUrl, previewDims, onBboxSaved }) {
   const [activeTool, setActiveTool]   = useState("card");
   const [bboxes, setBboxes]           = useState({ card: null, nameRegion: null, numberRegion: null });
   const [saving, setSaving]           = useState(false);
   const [bboxToast, setBboxToast]     = useState(null);
 
-  const imgRef     = useRef(null);
-  const canvasRef  = useRef(null);
-  const bboxesRef  = useRef(bboxes);
-  bboxesRef.current = bboxes;
+  const imgRef       = useRef(null);
+  const canvasRef    = useRef(null);
+  const bboxesRef    = useRef(bboxes);
+  bboxesRef.current  = bboxes;
   const activeToolRef = useRef(activeTool);
   activeToolRef.current = activeTool;
-  const liveDrawRef = useRef(null);
+  const liveDrawRef  = useRef(null);
+  const previewDimsRef = useRef(previewDims);
+  previewDimsRef.current = previewDims;
 
   // Sync committed boxes from manifest when image changes
   useEffect(() => {
@@ -634,9 +640,14 @@ function BboxEditor({ activeId, activeImage, previewUrl, onBboxSaved }) {
     canvas.width  = img.clientWidth;
     canvas.height = img.clientHeight;
 
-    const ctx    = canvas.getContext("2d");
-    const scaleX = img.clientWidth  / img.naturalWidth;
-    const scaleY = img.clientHeight / img.naturalHeight;
+    const ctx     = canvas.getContext("2d");
+    // Use original image dimensions for coordinate mapping so bboxes stored in
+    // full-res pixel space align correctly even when showing a downscaled preview.
+    const dims    = previewDimsRef.current;
+    const origW   = dims?.origWidth  ?? img.naturalWidth;
+    const origH   = dims?.origHeight ?? img.naturalHeight;
+    const scaleX  = img.clientWidth  / origW;
+    const scaleY  = img.clientHeight / origH;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -722,8 +733,11 @@ function BboxEditor({ activeId, activeImage, previewUrl, onBboxSaved }) {
 
     const img = imgRef.current;
     if (!img || !img.clientWidth) return;
-    const sx = img.naturalWidth  / img.clientWidth;
-    const sy = img.naturalHeight / img.clientHeight;
+    const dims = previewDimsRef.current;
+    const origW = dims?.origWidth  ?? img.naturalWidth;
+    const origH = dims?.origHeight ?? img.naturalHeight;
+    const sx = origW / img.clientWidth;
+    const sy = origH / img.clientHeight;
     const box = [
       Math.round(rawX * sx), Math.round(rawY * sy),
       Math.round(rawW * sx), Math.round(rawH * sy),
@@ -789,7 +803,7 @@ function BboxEditor({ activeId, activeImage, previewUrl, onBboxSaved }) {
       {/* Image + canvas overlay */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {previewUrl ? (
-          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%" }}>
+          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "100%", overflow: "hidden" }}>
             <img
               ref={imgRef}
               src={previewUrl}
@@ -843,11 +857,13 @@ export default function ProcessPage() {
   const [filterScope, setFilterScope] = useState("raw");
   const [filterStatus, setFilterStatus] = useState("unprocessed");
   const [filterReady, setFilterReady] = useState("missing");
+  const [filterBbox, setFilterBbox] = useState("nobbox");
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH_SIZE);
 
   const { map: thumbs, ensure: ensureThumb } = useThumbCache();
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewUrl, setPreviewUrl]   = useState(null);
+  const [previewDims, setPreviewDims] = useState(null); // { origWidth, origHeight }
   const previewTimerRef = useRef(null);
   const previewTokenRef = useRef(0);
   const listRef = useRef(null);
@@ -877,6 +893,8 @@ export default function ProcessPage() {
     return { total, raw, processed, unprocessed: total - processed, ready, missing: total - ready };
   }, [images]);
 
+  const hasBbox = (img) => !!(img.bbox?.card && img.bbox?.nameRegion && img.bbox?.numberRegion);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return images.filter((img) => {
@@ -885,13 +903,15 @@ export default function ProcessPage() {
       if (filterStatus === "unprocessed" && isProcessed(img)) return false;
       if (filterReady === "ready" && !isRowReady(img)) return false;
       if (filterReady === "missing" && isRowReady(img)) return false;
+      if (filterBbox === "nobbox" && hasBbox(img)) return false;
+      if (filterBbox === "hasbbox" && !hasBbox(img)) return false;
       if (!q) return true;
       return [img.id, img.file, img.card?.setCode, img.card?.number, img.card?.name, img.finish, ...(img.stamps || [])]
         .filter(Boolean).join(" ").toLowerCase().includes(q);
     });
-  }, [images, filterScope, filterStatus, filterReady, search]);
+  }, [images, filterScope, filterStatus, filterReady, filterBbox, search]);
 
-  useEffect(() => { setVisibleCount(VISIBLE_BATCH_SIZE); }, [filterScope, filterStatus, filterReady, search, images.length]);
+  useEffect(() => { setVisibleCount(VISIBLE_BATCH_SIZE); }, [filterScope, filterStatus, filterReady, filterBbox, search, images.length]);
 
   const visibleItems = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
   const activeIndex = useMemo(() => filtered.findIndex((x) => x.id === activeId), [filtered, activeId]);
@@ -911,12 +931,14 @@ export default function ProcessPage() {
     previewTokenRef.current += 1;
     const token = previewTokenRef.current;
     setPreviewUrl(null);
+    setPreviewDims(null);
     previewTimerRef.current = setTimeout(async () => {
       try {
-        const res = await window.visionlab.getImageDataUrl({ id });
+        const res = await window.visionlab.getPreviewDataUrl({ id });
         if (!res?.ok || !res.dataUrl) return;
         if (previewTokenRef.current !== token) return;
         setPreviewUrl(res.dataUrl);
+        if (res.origWidth && res.origHeight) setPreviewDims({ origWidth: res.origWidth, origHeight: res.origHeight });
       } catch {}
     }, 120);
   }, []);
@@ -1169,6 +1191,7 @@ export default function ProcessPage() {
           </div>
           <div className="vlRow" style={{ gap: 10, marginTop: 10, flexWrap: "wrap" }}>
             <Segmented value={filterReady} options={[{ value: "missing", label: "Missing" }, { value: "ready", label: "Ready" }, { value: "any", label: "Any" }]} onChange={setFilterReady} />
+            <Segmented value={filterBbox} options={[{ value: "nobbox", label: "No bbox" }, { value: "hasbbox", label: "Has bbox" }, { value: "any", label: "Any" }]} onChange={setFilterBbox} />
           </div>
 
           <input className="vlInput" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search id / file / set / number / name…" style={{ marginTop: 10 }} />
@@ -1362,6 +1385,7 @@ export default function ProcessPage() {
               activeId={activeId}
               activeImage={activeImage}
               previewUrl={previewUrl}
+              previewDims={previewDims}
               onBboxSaved={(updatedImg) =>
                 setImages((prev) => prev.map((x) => x.id === activeId ? updatedImg : x))
               }

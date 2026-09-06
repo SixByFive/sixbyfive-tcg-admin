@@ -19,7 +19,9 @@ const visionlabAPI = {
   updateImageMeta: (payload) => ipcRenderer.invoke('visionlab:updateImageMeta', payload),
   renameRawFiles:  (payload) => ipcRenderer.invoke('visionlab:renameRawFiles', payload),
 
-  getImageDataUrl: (payload) => ipcRenderer.invoke('visionlab:getImageDataUrl', payload),
+  getImageDataUrl:     (payload) => ipcRenderer.invoke('visionlab:getImageDataUrl', payload),
+  getThumbnailDataUrl: (payload) => ipcRenderer.invoke('visionlab:getThumbnailDataUrl', payload),
+  getPreviewDataUrl:   (payload) => ipcRenderer.invoke('visionlab:getPreviewDataUrl', payload),
 
   exportTrainingDatasets: (payload) => ipcRenderer.invoke('visionlab:exportTrainingDatasets', payload),
   splitTrainingDatasets:  (payload) => ipcRenderer.invoke('visionlab:splitTrainingDatasets', payload),

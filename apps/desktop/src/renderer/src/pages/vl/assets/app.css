@@ -539,6 +539,7 @@
   display: grid;
   gap: 8px;
   overflow: auto;
+  scrollbar-gutter: stable;
   min-height: 0;
   flex: 1;
 }

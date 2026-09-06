@@ -25,7 +25,11 @@ import {
   renameRawFiles,
 } from "./handlers/process.handlers.js";
 
-import { getImageDataUrl } from "./handlers/preview.handlers.js";
+import {
+  getImageDataUrl,
+  getThumbnailDataUrl,
+  getPreviewDataUrl,
+} from "./handlers/preview.handlers.js";
 import { exportTrainingDatasetsHandler } from "./handlers/export.handlers.js";
 import { splitTrainingDatasetsHandler } from "./handlers/split.handlers.js";
 
@@ -83,7 +87,9 @@ export function registerIpcHandlers() {
   ipcMain.handle("visionlab:renameRawFiles",   renameRawFiles);
 
   // ── Preview ────────────────────────────────────────────────────────────────
-  ipcMain.handle("visionlab:getImageDataUrl", getImageDataUrl);
+  ipcMain.handle("visionlab:getImageDataUrl",     getImageDataUrl);
+  ipcMain.handle("visionlab:getThumbnailDataUrl", getThumbnailDataUrl);
+  ipcMain.handle("visionlab:getPreviewDataUrl",   getPreviewDataUrl);
 
   // ── Export / split datasets ────────────────────────────────────────────────
   ipcMain.handle("visionlab:exportTrainingDatasets", exportTrainingDatasetsHandler);
