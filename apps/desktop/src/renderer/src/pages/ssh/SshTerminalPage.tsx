@@ -136,6 +136,30 @@ export function SshTerminalPage(): JSX.Element {
 
     term.onData(data => { api.input({ tabId, data }) })
 
+    // Ctrl+C: copy selection if text is selected, otherwise send ^C to shell
+    // Ctrl+V: paste from system clipboard into the terminal
+    // Ctrl+Shift+C/V: always copy/paste (no ambiguity)
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type !== 'keydown') return true
+
+      if (ev.ctrlKey && !ev.shiftKey && ev.key === 'c' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+        return false
+      }
+      if ((ev.ctrlKey && !ev.shiftKey && ev.key === 'v') ||
+          (ev.ctrlKey && ev.shiftKey && ev.key === 'V')) {
+        navigator.clipboard.readText().then(text => {
+          if (text) api.input({ tabId, data: text })
+        }).catch(() => {})
+        return false
+      }
+      if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') {
+        navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+        return false
+      }
+      return true
+    })
+
     const ro = new ResizeObserver(() => {
       try {
         fit.fit()
@@ -274,6 +298,18 @@ export function SshTerminalPage(): JSX.Element {
                 ref={el => { if (tab.id === activeTabId) mountTerminal(tab.id, el) }}
                 className="flex-1 overflow-hidden p-1"
                 style={{ visibility: tab.status === 'connecting' ? 'hidden' : 'visible' }}
+                onContextMenu={e => {
+                  e.preventDefault()
+                  const term = xtermRefs.current[tab.id]
+                  if (!term) return
+                  if (term.hasSelection()) {
+                    navigator.clipboard.writeText(term.getSelection()).catch(() => {})
+                  } else {
+                    navigator.clipboard.readText().then(text => {
+                      if (text) api.input({ tabId: tab.id, data: text })
+                    }).catch(() => {})
+                  }
+                }}
               />
             </div>
           ))}

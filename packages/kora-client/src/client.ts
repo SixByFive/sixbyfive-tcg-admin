@@ -2,8 +2,13 @@ export class KoraApiClient {
   private accessToken: string | null = null
   private adminKey: string | null = null
   private refreshCallback: (() => Promise<string | null>) | null = null
+  private fetchImpl: typeof globalThis.fetch = globalThis.fetch.bind(globalThis)
 
   constructor(private baseUrl: string) {}
+
+  setFetch(impl: typeof globalThis.fetch): void {
+    this.fetchImpl = impl
+  }
 
   setBaseUrl(url: string): void {
     this.baseUrl = url
@@ -30,7 +35,7 @@ export class KoraApiClient {
   async adminRest<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (this.adminKey) headers['x-admin-key'] = this.adminKey
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...options,
       headers: { ...headers, ...(options.headers as Record<string, string> || {}) },
     })
@@ -50,7 +55,7 @@ export class KoraApiClient {
     options: RequestInit & { skipAuthRefresh?: boolean } = {}
   ): Promise<T> {
     const { skipAuthRefresh, ...fetchOptions } = options
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...fetchOptions,
       headers: { ...this.headers(), ...(fetchOptions.headers as Record<string, string> || {}) },
     })

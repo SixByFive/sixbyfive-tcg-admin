@@ -152,6 +152,16 @@ app.whenReady().then(() => {
   registerMarketingIpcHandlers()
   registerMarketingVideoIpcHandlers()
 
+  // Proxy Kora API requests through the main process to bypass renderer CORS
+  // restrictions (file:// null origin is blocked by Chromium even with webSecurity:false)
+  ipcMain.handle('kora:fetch', async (_evt, { url, method, headers, body }: {
+    url: string; method: string; headers?: Record<string, string>; body?: string
+  }) => {
+    const res = await fetch(url, { method, headers, body })
+    const text = await res.text()
+    return { ok: res.ok, status: res.status, text }
+  })
+
   ipcMain.handle('vault:list',             vaultList)
   ipcMain.handle('vault:getPassword',      vaultGetPassword)
   ipcMain.handle('vault:save',             vaultSave)

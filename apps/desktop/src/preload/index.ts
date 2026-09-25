@@ -74,6 +74,11 @@ const visionlabAPI = {
   runBootstrap:           (args)   => ipcRenderer.invoke('visionlab:runBootstrap', args ?? {}),
 }
 
+const koraProxyAPI = {
+  fetch: (args: { url: string; method: string; headers?: Record<string, string>; body?: string }) =>
+    ipcRenderer.invoke('kora:fetch', args),
+}
+
 const vaultAPI = {
   list:             ()       => ipcRenderer.invoke('vault:list'),
   getPassword:      (id)     => ipcRenderer.invoke('vault:getPassword', { id }),
@@ -161,6 +166,7 @@ const marketingAPI = {
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('koraProxy', koraProxyAPI)
     contextBridge.exposeInMainWorld('visionlab', visionlabAPI)
     contextBridge.exposeInMainWorld('vault', vaultAPI)
     contextBridge.exposeInMainWorld('statusBoard', statusAPI)
@@ -175,6 +181,8 @@ if (process.contextIsolated) {
 } else {
   // @ts-ignore
   window.electron = electronAPI
+  // @ts-ignore
+  window.koraProxy = koraProxyAPI
   // @ts-ignore
   window.visionlab = visionlabAPI
   // @ts-ignore
