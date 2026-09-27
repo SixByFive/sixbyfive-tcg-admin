@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, Notification, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Notification, dialog, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -153,11 +153,13 @@ app.whenReady().then(() => {
   registerMarketingVideoIpcHandlers()
 
   // Proxy Kora API requests through the main process to bypass renderer CORS
-  // restrictions (file:// null origin is blocked by Chromium even with webSecurity:false)
+  // restrictions (file:// null origin is blocked by Chromium even with webSecurity:false).
+  // Uses net.fetch (Chromium network stack) instead of Node's fetch — same SSL
+  // certificate store and proxy settings as the renderer.
   ipcMain.handle('kora:fetch', async (_evt, { url, method, headers, body }: {
     url: string; method: string; headers?: Record<string, string>; body?: string
   }) => {
-    const res = await fetch(url, { method, headers, body })
+    const res = await net.fetch(url, { method, headers, body })
     const text = await res.text()
     return { ok: res.ok, status: res.status, text }
   })
