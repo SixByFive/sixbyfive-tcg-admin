@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { adminApi } from '@/lib/api'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { adminApi, apiClient } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import type { ProofQueueItem } from '@tcg-admin/types'
@@ -12,6 +12,8 @@ export function ProofQueuePage(): JSX.Element {
   const [error, setError] = useState('')
 
   const [selected, setSelected] = useState<ProofQueueItem | null>(null)
+  const [proofImageUrl, setProofImageUrl] = useState<string | null>(null)
+  const prevBlobUrl = useRef<string | null>(null)
   const [actionState, setActionState] = useState<ActionState>('idle')
   const [actionError, setActionError] = useState('')
   const [rejectReason, setRejectReason] = useState('')
@@ -26,6 +28,24 @@ export function ProofQueuePage(): JSX.Element {
 
   useEffect(() => { load() }, [load])
   useAutoRefresh(load)
+
+  // Fetch proof image with auth whenever selection changes
+  useEffect(() => {
+    const prev = prevBlobUrl.current
+    if (prev) { URL.revokeObjectURL(prev); prevBlobUrl.current = null }
+    setProofImageUrl(null)
+    if (!selected?.proofImagePath) return
+    let cancelled = false
+    apiClient.restBlob(`/marketplace-admin-proof/${encodeURIComponent(selected.id)}`)
+      .then(blob => {
+        if (cancelled) return
+        const url = URL.createObjectURL(blob)
+        prevBlobUrl.current = url
+        setProofImageUrl(url)
+      })
+      .catch(() => { /* silently hide if fetch fails */ })
+    return () => { cancelled = true }
+  }, [selected?.id, selected?.proofImagePath])
 
   const doAction = async (fn: () => Promise<void>) => {
     setActionState('loading'); setActionError('')
@@ -121,12 +141,17 @@ export function ProofQueuePage(): JSX.Element {
           {/* Proof image */}
           {selected.proofImagePath ? (
             <div className="rounded-lg border border-border overflow-hidden">
-              <img
-                src={`/marketplace-proof/${selected.id}`}
-                alt="Proof"
-                className="w-full object-contain max-h-48"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
+              {proofImageUrl ? (
+                <img
+                  src={proofImageUrl}
+                  alt="Proof"
+                  className="w-full object-contain max-h-48"
+                />
+              ) : (
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-xs text-muted-foreground">Loading image…</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-accent/20 p-4 text-center">

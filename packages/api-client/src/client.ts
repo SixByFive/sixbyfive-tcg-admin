@@ -109,4 +109,21 @@ export class ApiClient {
     if (!text) return null as T
     return JSON.parse(text) as T
   }
+
+  async restBlob(path: string, _isRetry = false): Promise<Blob> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      headers: this.headers(),
+    })
+
+    if (res.status === 401 && this.refreshCallback && !_isRetry) {
+      const newToken = await this.refreshCallback()
+      if (newToken) {
+        this.accessToken = newToken
+        return this.restBlob(path, true)
+      }
+    }
+
+    if (!res.ok) throw new Error(`${res.status}`)
+    return res.blob()
+  }
 }
