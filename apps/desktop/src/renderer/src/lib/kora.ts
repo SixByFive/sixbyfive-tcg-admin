@@ -8,7 +8,7 @@ import {
   createKoraDockerApi,
 } from '@sixbyfive/kora-client'
 
-const KORA_URL = import.meta.env.VITE_KORA_API_URL ?? 'http://localhost:3000'
+const KORA_URL = import.meta.env.VITE_KORA_API_URL ?? 'https://api.koraplatform.co.uk'
 const KORA_ADMIN_KEY = import.meta.env.VITE_KORA_ADMIN_KEY ?? ''
 
 // Route Kora API calls through the main process (IPC) so they bypass renderer

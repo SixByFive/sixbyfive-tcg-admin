@@ -159,7 +159,11 @@ app.whenReady().then(() => {
   ipcMain.handle('kora:fetch', async (_evt, { url, method, headers, body }: {
     url: string; method: string; headers?: Record<string, string>; body?: string
   }) => {
-    const res = await net.fetch(url, { method, headers, body })
+    // Use Node's built-in fetch (available in Node 22+) rather than net.fetch:
+    // net.fetch uses Chromium's network stack from the main process and can fail
+    // with ERR_CONNECTION_REFUSED on some hosts due to session-partitioning
+    // behaviour in Electron 33. Node fetch uses the system TLS stack directly.
+    const res = await fetch(url, { method, headers, body })
     const text = await res.text()
     return { ok: res.ok, status: res.status, text }
   })
